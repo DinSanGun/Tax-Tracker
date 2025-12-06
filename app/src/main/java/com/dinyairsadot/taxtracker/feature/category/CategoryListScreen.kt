@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -21,37 +22,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.dinyairsadot.taxtracker.core.domain.Category
-import com.dinyairsadot.taxtracker.core.domain.PaymentStatus
 import androidx.core.graphics.toColorInt
 
-
-// Temporary dummy data – later this will come from user's data
-private val dummyCategories = listOf(
-    Category(
-        id = 1,
-        name = "Electricity",
-        colorHex = "#FF9800",
-        description = "Electricity provider bills"
-    ),
-    Category(
-        id = 2,
-        name = "Water",
-        colorHex = "#2196F3",
-        description = "Water and sewage"
-    ),
-    Category(
-        id = 3,
-        name = "City Taxes",
-        colorHex = "#4CAF50",
-        description = "Arnona / city hall payments"
-    ),
-)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CategoryListScreen(
-    // Later we’ll add parameters
-
+    isLoading: Boolean,
+    categories: List<CategoryUi>,
+    errorMessage: String?,
+    onAddCategoryClick: () -> Unit,
+    onCategoryClick: (Long) -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -61,9 +41,7 @@ fun CategoryListScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = {
-                    // TODO: navigate to "Add Category" screen
-                }
+                onClick = onAddCategoryClick
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
@@ -72,16 +50,48 @@ fun CategoryListScreen(
             }
         }
     ) { innerPadding ->
-        CategoryListContent(
-            categories = dummyCategories,
-            modifier = Modifier.padding(innerPadding)
-        )
+        when {
+            isLoading -> {
+                Box(
+                    modifier = Modifier
+                        .padding(innerPadding)
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            errorMessage != null -> {
+                Box(
+                    modifier = Modifier
+                        .padding(innerPadding)
+                        .fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = errorMessage,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+
+            else -> {
+                CategoryListContent(
+                    categories = categories,
+                    onCategoryClick = onCategoryClick,
+                    modifier = Modifier.padding(innerPadding)
+                )
+            }
+        }
     }
 }
 
 @Composable
 private fun CategoryListContent(
-    categories: List<Category>,
+    categories: List<CategoryUi>,
+    onCategoryClick: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (categories.isEmpty()) {
@@ -107,9 +117,7 @@ private fun CategoryListContent(
             items(categories) { category ->
                 CategoryItem(
                     category = category,
-                    onClick = {
-                        // TODO: navigate to that category's invoice list
-                    }
+                    onClick = { onCategoryClick(category.id) }
                 )
             }
         }
@@ -118,7 +126,7 @@ private fun CategoryListContent(
 
 @Composable
 private fun CategoryItem(
-    category: Category,
+    category: CategoryUi,
     onClick: () -> Unit
 ) {
     Card(
@@ -149,7 +157,7 @@ private fun CategoryItem(
                         fontWeight = FontWeight.Bold
                     )
                 )
-                if (!category.description.isNullOrBlank()) {
+                if (category.description.isNotBlank()) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = category.description,
