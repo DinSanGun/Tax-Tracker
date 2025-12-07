@@ -6,9 +6,12 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.dinyairsadot.taxtracker.feature.category.CategoryListRoute
+import com.dinyairsadot.taxtracker.feature.category.AddCategoryScreen
 
+// Simple sealed class to define app routes
 sealed class Screen(val route: String) {
     data object CategoryList : Screen("category_list")
+    data object AddCategory : Screen("add_category")
 }
 
 @Composable
@@ -24,10 +27,18 @@ fun TaxTrackerNavHost(
         composable(Screen.CategoryList.route) {
             CategoryListRoute(
                 onAddCategoryClick = {
-                    // TODO: navigate to Add Category screen
+                    navController.navigate(Screen.AddCategory.route)
                 },
                 onCategoryClick = { id ->
-                    // TODO: navigate to category details
+                    // TODO: later navigate to category details or invoices list
+                }
+            )
+        }
+
+        composable(Screen.AddCategory.route) {
+            AddCategoryScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
                 }
             )
         }
