@@ -39,6 +39,10 @@ fun TaxTrackerNavHost(
             AddCategoryScreen(
                 onNavigateBack = {
                     navController.popBackStack()
+                },
+                onSaveCategory = { name, colorHex, description ->
+                    // TODO: next step - send this to a ViewModel / repository
+                    // For now we just ignore it (but we *receive* it successfully)
                 }
             )
         }
