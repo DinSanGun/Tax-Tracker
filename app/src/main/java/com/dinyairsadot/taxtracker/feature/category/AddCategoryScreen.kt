@@ -34,6 +34,9 @@ fun AddCategoryScreen(
     var colorHex by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
 
+    var nameError by remember { mutableStateOf<String?>(null) }
+    var colorError by remember { mutableStateOf<String?>(null) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -58,8 +61,19 @@ fun AddCategoryScreen(
 
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it },
-                label = { Text("Category name") },
+                onValueChange = {
+                    name = it
+                    if (nameError != null && it.isNotBlank()) {
+                        nameError = null
+                    }
+                },
+                label = { Text("Category name *") },
+                isError = nameError != null,
+                supportingText = {
+                    if (nameError != null) {
+                        Text(nameError!!)
+                    }
+                },
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -67,9 +81,20 @@ fun AddCategoryScreen(
 
             OutlinedTextField(
                 value = colorHex,
-                onValueChange = { colorHex = it },
-                label = { Text("Color hex (#RRGGBB)") },
+                onValueChange = {
+                    colorHex = it
+                    if (colorError != null) {
+                        colorError = null
+                    }
+                },
+                label = { Text("Color hex (#RRGGBB, optional)") },
                 placeholder = { Text("#FF9800") },
+                isError = colorError != null,
+                supportingText = {
+                    if (colorError != null) {
+                        Text(colorError!!)
+                    }
+                },
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -78,7 +103,7 @@ fun AddCategoryScreen(
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                label = { Text("Description") },
+                label = { Text("Description (optional)") },
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -86,8 +111,31 @@ fun AddCategoryScreen(
 
             Button(
                 onClick = {
-                    onSaveCategory(name, colorHex, description)
-                    onNavigateBack()
+                    var hasError = false
+
+                    // Name must not be blank
+                    if (name.isBlank()) {
+                        nameError = "Name is required"
+                        hasError = true
+                    }
+
+                    // Color must be either empty or look like #RRGGBB
+                    if (colorHex.isNotBlank()) {
+                        val pattern = Regex("^#[0-9A-Fa-f]{6}\$")
+                        if (!pattern.matches(colorHex.trim())) {
+                            colorError = "Use format #RRGGBB (e.g. #FF9800)"
+                            hasError = true
+                        }
+                    }
+
+                    if (!hasError) {
+                        onSaveCategory(
+                            name.trim(),
+                            colorHex.trim(),
+                            description.trim()
+                        )
+                        onNavigateBack()
+                    }
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
