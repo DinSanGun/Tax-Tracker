@@ -17,12 +17,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,6 +99,23 @@ fun AddCategoryScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Quick color presets",
+                style = MaterialTheme.typography.labelMedium
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            CategoryColorOptionsRow(
+                selectedColorHex = colorHex,
+                onColorSelected = { selected ->
+                    colorHex = selected
+                    colorError = null          // presets are known-valid
+                }
             )
 
             Spacer(modifier = Modifier.height(12.dp))

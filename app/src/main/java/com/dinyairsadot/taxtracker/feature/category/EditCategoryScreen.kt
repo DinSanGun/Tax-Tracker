@@ -15,6 +15,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -100,6 +101,23 @@ fun EditCategoryScreen(
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Quick color presets",
+                style = MaterialTheme.typography.labelMedium
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            CategoryColorOptionsRow(
+                selectedColorHex = colorHex,
+                onColorSelected = { selected ->
+                    colorHex = selected
+                    colorError = null          // again, presets are valid
+                }
             )
 
             Spacer(modifier = Modifier.height(12.dp))
