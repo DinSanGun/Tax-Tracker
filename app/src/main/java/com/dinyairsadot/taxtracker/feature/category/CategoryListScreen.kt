@@ -248,8 +248,13 @@ private fun CategoryItem(
  */
 private fun parseColor(hex: String): Color {
     return try {
-        Color(hex.toColorInt())
+        if (hex.isBlank()) {
+            Color.Gray
+        } else {
+            Color(hex.toColorInt())
+        }
     } catch (e: IllegalArgumentException) {
         Color.Gray
     }
 }
+

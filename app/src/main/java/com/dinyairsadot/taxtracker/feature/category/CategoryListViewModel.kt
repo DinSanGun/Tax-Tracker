@@ -67,20 +67,21 @@ class CategoryListViewModel(
     fun addCategory(name: String, colorHex: String, description: String) {
         viewModelScope.launch {
             try {
-                // Get current categories to compute next ID
                 val current = categoryRepository.getCategories()
-                val nextId = (current.maxOfOrNull { it.id } ?: 0) + 1
+                val nextId = (current.maxOfOrNull { it.id } ?: 0L) + 1L
+
+                // ✅ If color is blank, use a default
+                val safeColorHex = if (colorHex.isBlank()) "#FF9800" else colorHex.trim()
 
                 val newCategory = Category(
                     id = nextId,
                     name = name,
-                    colorHex = colorHex,
+                    colorHex = safeColorHex,
                     description = description.ifBlank { null }
                 )
 
                 categoryRepository.addCategory(newCategory)
 
-                // Reload and update UI state
                 val updated = categoryRepository.getCategories()
                 _uiState.value = _uiState.value.copy(
                     categories = updated.map { it.toUi() },
