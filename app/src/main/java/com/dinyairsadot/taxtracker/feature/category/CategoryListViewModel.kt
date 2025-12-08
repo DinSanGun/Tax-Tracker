@@ -112,6 +112,39 @@ class CategoryListViewModel(
             }
         }
     }
+
+    fun updateCategory(
+        id: Long,
+        name: String,
+        colorHex: String,
+        description: String
+    ) {
+        viewModelScope.launch {
+            try {
+                // Reuse the same safe color logic as addCategory
+                val safeColorHex = if (colorHex.isBlank()) "#FF9800" else colorHex.trim()
+
+                val updatedCategory = Category(
+                    id = id,
+                    name = name.trim(),
+                    colorHex = safeColorHex,
+                    description = description.trim().ifBlank { null }
+                )
+
+                categoryRepository.updateCategory(updatedCategory)
+
+                val updatedList = categoryRepository.getCategories()
+                _uiState.value = _uiState.value.copy(
+                    categories = updatedList.map { it.toUi() },
+                    errorMessage = null
+                )
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = "Failed to update category"
+                )
+            }
+        }
+    }
 }
 
 // Mapping from domain model to UI model

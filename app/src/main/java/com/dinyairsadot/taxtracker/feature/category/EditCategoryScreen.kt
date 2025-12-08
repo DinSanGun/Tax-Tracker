@@ -17,23 +17,26 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddCategoryScreen(
+fun EditCategoryScreen(
+    initialName: String,
+    initialColorHex: String,
+    initialDescription: String,
     onNavigateBack: () -> Unit,
     onSaveCategory: (name: String, colorHex: String, description: String) -> Unit,
-    existingNamesLower: Set<String>
+    otherNamesLower: Set<String>
 ) {
-    var name by remember { mutableStateOf("") }
-    var colorHex by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf(initialName) }
+    var colorHex by remember { mutableStateOf(initialColorHex) }
+    var description by remember { mutableStateOf(initialDescription) }
 
     var nameError by remember { mutableStateOf<String?>(null) }
     var colorError by remember { mutableStateOf<String?>(null) }
@@ -41,7 +44,7 @@ fun AddCategoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add Category") },
+                title = { Text("Edit Category") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
@@ -114,13 +117,11 @@ fun AddCategoryScreen(
                 onClick = {
                     var hasError = false
 
-                    // Name must not be blank
                     if (name.isBlank()) {
                         nameError = "Name is required"
                         hasError = true
                     }
 
-                    // Color must be either empty or look like #RRGGBB
                     if (colorHex.isNotBlank()) {
                         val pattern = Regex("^#[0-9A-Fa-f]{6}\$")
                         if (!pattern.matches(colorHex.trim())) {
@@ -130,7 +131,7 @@ fun AddCategoryScreen(
                     }
 
                     val trimmedLower = name.trim().lowercase()
-                    if (!hasError && existingNamesLower.contains(trimmedLower)) {
+                    if (!hasError && otherNamesLower.contains(trimmedLower)) {
                         nameError = "A category with this name already exists"
                         hasError = true
                     }
@@ -146,7 +147,7 @@ fun AddCategoryScreen(
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Save")
+                Text("Save changes")
             }
         }
     }

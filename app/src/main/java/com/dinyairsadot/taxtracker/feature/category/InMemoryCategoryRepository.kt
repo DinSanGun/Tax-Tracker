@@ -39,4 +39,11 @@ class InMemoryCategoryRepository : CategoryRepository {
     override suspend fun deleteCategory(id: Long) {
         categories.removeAll { it.id == id }
     }
+
+    override suspend fun updateCategory(category: Category) {
+        val index = categories.indexOfFirst { it.id == category.id }
+        if (index != -1) {
+            categories[index] = category
+        }
+    }
 }
