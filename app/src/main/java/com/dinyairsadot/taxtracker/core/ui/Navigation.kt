@@ -14,6 +14,7 @@ import com.dinyairsadot.taxtracker.feature.category.AddCategoryScreen
 import com.dinyairsadot.taxtracker.feature.category.CategoryListRoute
 import com.dinyairsadot.taxtracker.feature.category.CategoryListViewModel
 import com.dinyairsadot.taxtracker.feature.category.EditCategoryScreen
+import com.dinyairsadot.taxtracker.feature.invoice.InvoiceListScreen
 
 // Adjust if your Screen definitions live elsewhere
 sealed class Screen(val route: String) {
@@ -22,6 +23,10 @@ sealed class Screen(val route: String) {
     object EditCategory : Screen("edit_category/{categoryId}") {
         const val ARG_CATEGORY_ID = "categoryId"
         fun routeWithId(id: Long): String = "edit_category/$id"
+    }
+
+    object InvoiceList : Screen("invoice_list/{categoryId}") {
+        fun routeWithCategoryId(categoryId: Long) = "invoice_list/$categoryId"
     }
 }
 
@@ -148,6 +153,20 @@ fun TaxTrackerNavHost(
                     viewModel.deleteCategory(category.id)
                     // EditCategoryScreen's delete dialog already calls onNavigateBack()
                 }
+            )
+        }
+        // -------------------------
+        // Invoice list screen
+        // -------------------------
+        composable(
+            route = Screen.InvoiceList.route,
+            arguments = listOf(navArgument("categoryId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val categoryId = backStackEntry.arguments?.getLong("categoryId") ?: return@composable
+
+            InvoiceListScreen(
+                categoryId = categoryId,
+                onBackClick = { navController.popBackStack() }
             )
         }
     }
