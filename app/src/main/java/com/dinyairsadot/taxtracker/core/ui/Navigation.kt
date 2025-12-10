@@ -55,7 +55,7 @@ fun TaxTrackerNavHost(
                     navController.navigate(Screen.AddCategory.route)
                 },
                 onCategoryClick = { id ->
-                    navController.navigate(Screen.EditCategory.routeWithId(id))
+                    navController.navigate(Screen.InvoiceList.routeWithCategoryId(id))
                 },
                 viewModel = viewModel,
                 showCategoryAddedMessage = categoryAdded,
@@ -148,10 +148,6 @@ fun TaxTrackerNavHost(
                         colorHex = colorHex,
                         description = description
                     )
-                },
-                onDeleteCategory = {
-                    viewModel.deleteCategory(category.id)
-                    // EditCategoryScreen's delete dialog already calls onNavigateBack()
                 }
             )
         }
@@ -166,7 +162,12 @@ fun TaxTrackerNavHost(
 
             InvoiceListScreen(
                 categoryId = categoryId,
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                onEditCategoryClick = {
+                    navController.navigate(
+                        Screen.EditCategory.routeWithId(categoryId)
+                    )
+                }
             )
         }
     }

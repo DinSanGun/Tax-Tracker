@@ -3,13 +3,11 @@ package com.dinyairsadot.taxtracker.feature.category
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -28,7 +26,6 @@ fun EditCategoryScreen(
     otherNamesLower: Set<String>,
     onNavigateBack: () -> Unit,
     onSaveCategory: (name: String, colorHex: String, description: String) -> Unit,
-    onDeleteCategory: () -> Unit
 ) {
     var name by rememberSaveable { mutableStateOf(initialName) }
     var colorHex by rememberSaveable { mutableStateOf(initialColorHex) }
@@ -36,8 +33,6 @@ fun EditCategoryScreen(
 
     var nameError by remember { mutableStateOf<String?>(null) }
     var colorError by remember { mutableStateOf<String?>(null) }
-
-    var showDeleteDialog by remember { mutableStateOf(false) }
 
     fun onSaveClicked() {
         var hasError = false
@@ -88,8 +83,7 @@ fun EditCategoryScreen(
         onDescriptionChange = { newDesc ->
             description = newDesc
         },
-        onSaveClick = { onSaveClicked() },
-        onDeleteClick = { showDeleteDialog = true }
+        onSaveClick = { onSaveClicked() }
     )
 
     Scaffold(
@@ -112,35 +106,6 @@ fun EditCategoryScreen(
             callbacks = formCallbacks,
             saveButtonLabel = "Save changes",
             modifier = Modifier.padding(innerPadding)
-        )
-    }
-
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete category?") },
-            text = {
-                Text(
-                    "Are you sure you want to delete this category? " +
-                            "All data associated with it will be removed."
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        onDeleteCategory()
-                        onNavigateBack()
-                    }
-                ) {
-                    Text("Delete")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel")
-                }
-            }
         )
     }
 }

@@ -23,7 +23,6 @@ data class CategoryFormCallbacks(
     val onColorHexChange: (String) -> Unit,
     val onDescriptionChange: (String) -> Unit,
     val onSaveClick: () -> Unit,
-    val onDeleteClick: (() -> Unit)? = null
 )
 
 @Composable
@@ -102,15 +101,6 @@ fun CategoryForm(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(saveButtonLabel)
-        }
-
-        callbacks.onDeleteClick?.let { delete ->
-            TextButton(
-                onClick = delete,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Delete category")
-            }
         }
     }
 }

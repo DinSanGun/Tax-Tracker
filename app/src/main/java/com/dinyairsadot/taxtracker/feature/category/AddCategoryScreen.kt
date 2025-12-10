@@ -82,8 +82,7 @@ fun AddCategoryScreen(
         onDescriptionChange = { newDesc ->
             description = newDesc
         },
-        onSaveClick = { onSaveClicked() },
-        onDeleteClick = null
+        onSaveClick = { onSaveClicked() }
     )
 
     Scaffold(
