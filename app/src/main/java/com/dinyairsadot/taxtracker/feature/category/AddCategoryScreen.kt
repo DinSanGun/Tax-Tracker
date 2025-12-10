@@ -31,7 +31,8 @@ import androidx.compose.ui.graphics.Color
 fun AddCategoryScreen(
     onNavigateBack: () -> Unit,
     onSaveCategory: (name: String, colorHex: String, description: String) -> Unit,
-    existingNamesLower: Set<String>
+    existingNamesLower: Set<String>,
+    onCategorySaved: () -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var colorHex by remember { mutableStateOf("") }
@@ -160,6 +161,7 @@ fun AddCategoryScreen(
                             colorHex.trim(),
                             description.trim()
                         )
+                        onCategorySaved()
                         onNavigateBack()
                     }
                 },

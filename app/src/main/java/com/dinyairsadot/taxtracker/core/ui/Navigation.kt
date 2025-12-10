@@ -36,6 +36,9 @@ fun TaxTrackerNavHost(
         composable(Screen.CategoryList.route) { backStackEntry ->
             val viewModel: CategoryListViewModel = viewModel(backStackEntry)
 
+            val categoryAdded =
+                backStackEntry.savedStateHandle.get<Boolean>("category_added") == true
+
             CategoryListRoute(
                 onAddCategoryClick = {
                     navController.navigate(Screen.AddCategory.route)
@@ -43,7 +46,11 @@ fun TaxTrackerNavHost(
                 onCategoryClick = { id ->
                     navController.navigate(Screen.EditCategory.routeWithId(id))
                 },
-                viewModel = viewModel
+                viewModel = viewModel,
+                showCategoryAddedMessage = categoryAdded,
+                onCategoryAddedMessageShown = {
+                    backStackEntry.savedStateHandle.remove<Boolean>("category_added")
+                }
             )
         }
 
@@ -53,7 +60,6 @@ fun TaxTrackerNavHost(
             }
             val viewModel: CategoryListViewModel = viewModel(parentEntry)
 
-            // ✅ Collect existing names (case-insensitive)
             val existingNamesLower = viewModel.uiState.value.categories
                 .map { it.name.trim().lowercase() }
                 .toSet()
@@ -65,7 +71,13 @@ fun TaxTrackerNavHost(
                 onSaveCategory = { name, colorHex, description ->
                     viewModel.addCategory(name, colorHex, description)
                 },
-                existingNamesLower = existingNamesLower
+                existingNamesLower = existingNamesLower,
+                onCategorySaved = {
+                    navController
+                        .previousBackStackEntry
+                        ?.savedStateHandle
+                        ?.set("category_added", true)
+                }
             )
         }
 
