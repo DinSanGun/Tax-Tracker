@@ -92,6 +92,37 @@ class InvoiceListViewModel(
             loadInvoices(categoryId)
         }
     }
+
+    suspend fun getInvoice(invoiceId: Long): Invoice? {
+        return invoiceRepository.getInvoiceById(invoiceId)
+    }
+
+    fun updateInvoice(
+        invoiceId: Long,
+        amount: Double,
+        dateText: String,
+        paymentStatus: PaymentStatus,
+        notes: String
+    ) {
+        viewModelScope.launch {
+            val existing = invoiceRepository.getInvoiceById(invoiceId) ?: return@launch
+
+            val parsedDate = dateText
+                .takeIf { it.isNotBlank() }
+                ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+
+            val updated = existing.copy(
+                amount = amount,
+                paymentStatus = paymentStatus,
+                dueDate = parsedDate,
+                notes = notes.ifBlank { null }
+            )
+
+            invoiceRepository.updateInvoice(updated)
+            // Reload list for this category so the InvoiceListScreen sees the changes
+            loadInvoices(existing.categoryId)
+        }
+    }
 }
 
 // Mapping from domain model to UI model

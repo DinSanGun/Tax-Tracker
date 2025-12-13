@@ -15,8 +15,30 @@ import com.dinyairsadot.taxtracker.feature.category.CategoryListRoute
 import com.dinyairsadot.taxtracker.feature.category.CategoryListViewModel
 import com.dinyairsadot.taxtracker.feature.category.EditCategoryScreen
 import com.dinyairsadot.taxtracker.feature.invoice.InvoiceListScreen
-import com.dinyairsadot.taxtracker.feature.invoice.InvoiceListViewModel
 import com.dinyairsadot.taxtracker.feature.invoice.AddInvoiceScreen
+
+import androidx.compose.runtime.*
+
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+
+
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+
+import com.dinyairsadot.taxtracker.feature.invoice.InvoiceDetailsScreen
+import com.dinyairsadot.taxtracker.feature.invoice.InvoiceListViewModel
+
+import androidx.compose.ui.Alignment
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.ui.Modifier
 
 
 // Adjust if your Screen definitions live elsewhere
@@ -36,8 +58,13 @@ sealed class Screen(val route: String) {
         fun routeWithCategoryId(categoryId: Long) = "add_invoice/$categoryId"
     }
 
+    object InvoiceDetails : Screen("invoice_details/{invoiceId}") {
+        fun routeWithId(invoiceId: Long) = "invoice_details/$invoiceId"
+    }
+
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TaxTrackerNavHost(
     navController: NavHostController,
@@ -181,13 +208,14 @@ fun TaxTrackerNavHost(
                 uiState = uiState,
                 onBackClick = { navController.popBackStack() },
                 onEditCategoryClick = {
-                    navController.navigate(
-                        Screen.EditCategory.routeWithId(categoryId)
-                    )
+                    navController.navigate(Screen.EditCategory.routeWithId(categoryId))
                 },
                 onAddInvoiceClick = {
+                    navController.navigate(Screen.AddInvoice.routeWithCategoryId(categoryId))
+                },
+                onInvoiceClick = { invoiceId ->
                     navController.navigate(
-                        Screen.AddInvoice.routeWithCategoryId(categoryId)
+                        Screen.InvoiceDetails.routeWithId(invoiceId)
                     )
                 }
             )
@@ -218,6 +246,59 @@ fun TaxTrackerNavHost(
                     // AddInvoiceScreen will also call onNavigateBack() after this
                 }
             )
+        }
+
+        composable(
+            route = Screen.InvoiceDetails.route,
+            arguments = listOf(navArgument("invoiceId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val invoiceId = backStackEntry.arguments?.getLong("invoiceId") ?: return@composable
+
+            // Share InvoiceListViewModel between list and details,
+            // just like you share CategoryListViewModel across screens.
+            val parentEntry = remember(backStackEntry) {
+                navController.getBackStackEntry(Screen.InvoiceList.route)
+            }
+            val viewModel: InvoiceListViewModel = viewModel(parentEntry)
+            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+            val invoice = uiState.invoices.firstOrNull { it.id == invoiceId }
+
+            if (invoice == null) {
+                Scaffold(
+                    topBar = {
+                        TopAppBar(
+                            title = { Text("Invoice not found") },
+                            navigationIcon = {
+                                IconButton(onClick = { navController.popBackStack() }) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Back"
+                                    )
+                                }
+                            }
+                        )
+                    }
+                ) { paddingValues ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("This invoice could not be loaded.")
+                    }
+                }
+            } else {
+                InvoiceDetailsScreen(
+                    invoice = invoice,
+                    onBackClick = { navController.popBackStack() },
+                    onEditClick = {
+                        // TODO.
+                        // Next step: navigate to EditInvoiceScreen here.
+                    }
+                )
+            }
         }
     }
 }

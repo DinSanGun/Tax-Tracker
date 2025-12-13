@@ -31,6 +31,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.clickable
+
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,7 +42,8 @@ fun InvoiceListScreen(
     uiState: InvoiceListUiState,
     onBackClick: () -> Unit,
     onEditCategoryClick: () -> Unit,
-    onAddInvoiceClick: () -> Unit
+    onAddInvoiceClick: () -> Unit,
+    onInvoiceClick: (Long) -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -102,7 +105,8 @@ fun InvoiceListScreen(
                 else -> {
                     InvoiceListContent(
                         invoices = uiState.invoices,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        onInvoiceClick = onInvoiceClick
                     )
                 }
             }
@@ -157,14 +161,18 @@ private fun EmptyInvoicesState(
 @Composable
 private fun InvoiceListContent(
     invoices: List<InvoiceUi>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onInvoiceClick: (Long) -> Unit
 ) {
     LazyColumn(
         modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(invoices) { invoice ->
-            InvoiceItem(invoice = invoice)
+            InvoiceItem(
+                invoice = invoice,
+                onClick = { onInvoiceClick(invoice.id) }
+            )
         }
     }
 }
@@ -172,10 +180,13 @@ private fun InvoiceListContent(
 @Composable
 private fun InvoiceItem(
     invoice: InvoiceUi,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
