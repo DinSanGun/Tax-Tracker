@@ -5,7 +5,7 @@ import com.dinyairsadot.taxtracker.core.domain.InvoiceRepository
 import com.dinyairsadot.taxtracker.core.domain.PaymentStatus
 import java.time.LocalDate
 
-class InMemoryInvoiceRepository : InvoiceRepository {
+object InMemoryInvoiceRepository : InvoiceRepository {
 
     // Mutable list so we can add/update/delete invoices at runtime.
     // For now we seed a couple of example invoices under categoryId = 1.

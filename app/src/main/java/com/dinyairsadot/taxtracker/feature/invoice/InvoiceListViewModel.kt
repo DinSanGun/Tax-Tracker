@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+
 
 data class InvoiceUi(
     val id: Long,
@@ -26,7 +28,7 @@ data class InvoiceListUiState(
 )
 
 class InvoiceListViewModel(
-    private val invoiceRepository: InvoiceRepository = InMemoryInvoiceRepository()
+    private val invoiceRepository: InvoiceRepository = InMemoryInvoiceRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(InvoiceListUiState(isLoading = true))
@@ -54,6 +56,40 @@ class InvoiceListViewModel(
                     errorMessage = "Failed to load invoices"
                 )
             }
+        }
+    }
+
+    fun addInvoice(
+        categoryId: Long,
+        amount: Double,
+        dateText: String,
+        paymentStatus: PaymentStatus,
+        notes: String
+    ) {
+        viewModelScope.launch {
+            // Compute next id based on current invoices from repository
+            val existing = invoiceRepository.getInvoicesForCategory(categoryId)
+            val nextId = (existing.maxOfOrNull { it.id } ?: 0L) + 1L
+
+            val parsedDate = dateText
+                .takeIf { it.isNotBlank() }
+                ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+
+            val newInvoice = Invoice(
+                id = nextId,
+                categoryId = categoryId,
+                invoiceNumber = "", // can be expanded later
+                amount = amount,
+                paymentStatus = paymentStatus,
+                dueDate = parsedDate,
+                paymentDate = null,
+                consumptionValue = null,
+                consumptionUnit = null,
+                notes = notes.ifBlank { null }
+            )
+
+            invoiceRepository.addInvoice(newInvoice)
+            loadInvoices(categoryId)
         }
     }
 }

@@ -16,6 +16,7 @@ import com.dinyairsadot.taxtracker.feature.category.CategoryListViewModel
 import com.dinyairsadot.taxtracker.feature.category.EditCategoryScreen
 import com.dinyairsadot.taxtracker.feature.invoice.InvoiceListScreen
 import com.dinyairsadot.taxtracker.feature.invoice.InvoiceListViewModel
+import com.dinyairsadot.taxtracker.feature.invoice.AddInvoiceScreen
 
 
 // Adjust if your Screen definitions live elsewhere
@@ -30,6 +31,11 @@ sealed class Screen(val route: String) {
     object InvoiceList : Screen("invoice_list/{categoryId}") {
         fun routeWithCategoryId(categoryId: Long) = "invoice_list/$categoryId"
     }
+
+    object AddInvoice : Screen("add_invoice/{categoryId}") {
+        fun routeWithCategoryId(categoryId: Long) = "add_invoice/$categoryId"
+    }
+
 }
 
 @Composable
@@ -180,7 +186,36 @@ fun TaxTrackerNavHost(
                     )
                 },
                 onAddInvoiceClick = {
-                    // TODO: will navigate to AddInvoiceScreen in the next steps
+                    navController.navigate(
+                        Screen.AddInvoice.routeWithCategoryId(categoryId)
+                    )
+                }
+            )
+        }
+        // -------------------------
+        // Invoice add screen
+        // -------------------------
+        composable(
+            route = Screen.AddInvoice.route,
+            arguments = listOf(navArgument("categoryId") { type = NavType.LongType })
+        ) { backStackEntry ->
+            val categoryId = backStackEntry.arguments?.getLong("categoryId") ?: return@composable
+
+            // We don't need uiState here, just the ability to add an invoice.
+            val viewModel: InvoiceListViewModel = viewModel(backStackEntry)
+
+            AddInvoiceScreen(
+                categoryId = categoryId,
+                onNavigateBack = { navController.popBackStack() },
+                onSaveInvoice = { amount, dateText, paymentStatus, notes ->
+                    viewModel.addInvoice(
+                        categoryId = categoryId,
+                        amount = amount,
+                        dateText = dateText,
+                        paymentStatus = paymentStatus,
+                        notes = notes
+                    )
+                    // AddInvoiceScreen will also call onNavigateBack() after this
                 }
             )
         }
