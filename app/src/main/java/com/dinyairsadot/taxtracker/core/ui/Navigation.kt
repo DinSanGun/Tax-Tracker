@@ -229,6 +229,9 @@ fun TaxTrackerNavHost(
                     navController.navigate(
                         Screen.InvoiceDetails.routeWithId(invoiceId)
                     )
+                },
+                onDeleteInvoice = { invoiceId ->
+                    viewModel.deleteInvoice(invoiceId = invoiceId, categoryId = categoryId)
                 }
             )
         }

@@ -124,6 +124,17 @@ class InvoiceListViewModel(
             loadInvoices(existing.categoryId)
         }
     }
+
+    fun deleteInvoice(
+        invoiceId: Long,
+        categoryId: Long
+    ) {
+        viewModelScope.launch {
+            invoiceRepository.deleteInvoice(invoiceId)
+            // Refresh list so InvoiceListScreen sees updated data
+            loadInvoices(categoryId)
+        }
+    }
 }
 
 // Mapping from domain model to UI model
