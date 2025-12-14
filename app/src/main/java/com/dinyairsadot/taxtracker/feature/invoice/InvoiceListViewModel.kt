@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import com.dinyairsadot.taxtracker.core.domain.CategoryRepository
+import com.dinyairsadot.taxtracker.feature.category.InMemoryCategoryRepository
 
 
 data class InvoiceUi(
@@ -23,16 +25,31 @@ data class InvoiceUi(
 
 data class InvoiceListUiState(
     val isLoading: Boolean = false,
+    val categoryName: String? = null,
     val invoices: List<InvoiceUi> = emptyList(),
     val errorMessage: String? = null
 )
 
 class InvoiceListViewModel(
-    private val invoiceRepository: InvoiceRepository = InMemoryInvoiceRepository
+    private val invoiceRepository: InvoiceRepository = InMemoryInvoiceRepository,
+    private val categoryRepository: CategoryRepository = InMemoryCategoryRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(InvoiceListUiState(isLoading = true))
     val uiState: StateFlow<InvoiceListUiState> = _uiState.asStateFlow()
+
+
+    fun loadCategoryHeader(categoryId: Long) {
+        viewModelScope.launch {
+            try {
+                val category = categoryRepository.getCategories().firstOrNull { it.id == categoryId }
+                _uiState.value = _uiState.value.copy(categoryName = category?.name)
+            } catch (_: Exception) {
+                // If category can't be loaded, keep title fallback in UI
+                _uiState.value = _uiState.value.copy(categoryName = null)
+            }
+        }
+    }
 
     /**
      * Load invoices for a given category.
@@ -44,13 +61,13 @@ class InvoiceListViewModel(
         viewModelScope.launch {
             try {
                 val invoices = invoiceRepository.getInvoicesForCategory(categoryId)
-                _uiState.value = InvoiceListUiState(
+                _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     invoices = invoices.map { it.toUi() },
                     errorMessage = null
                 )
             } catch (_: Exception) {
-                _uiState.value = InvoiceListUiState(
+                _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     invoices = emptyList(),
                     errorMessage = "Failed to load invoices"

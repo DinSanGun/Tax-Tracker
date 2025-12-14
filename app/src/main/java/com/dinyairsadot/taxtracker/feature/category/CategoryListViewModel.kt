@@ -23,7 +23,7 @@ data class CategoryListUiState(
 )
 
 class CategoryListViewModel(
-    private val categoryRepository: CategoryRepository = InMemoryCategoryRepository()
+    private val categoryRepository: CategoryRepository = InMemoryCategoryRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CategoryListUiState(isLoading = true))

@@ -3,7 +3,7 @@ package com.dinyairsadot.taxtracker.feature.category
 import com.dinyairsadot.taxtracker.core.domain.Category
 import com.dinyairsadot.taxtracker.core.domain.CategoryRepository
 
-class InMemoryCategoryRepository : CategoryRepository {
+object InMemoryCategoryRepository : CategoryRepository {
 
     // Mutable list so we can add items at runtime
     private val categories = mutableListOf(

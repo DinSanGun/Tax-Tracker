@@ -63,7 +63,7 @@ fun InvoiceListScreen(
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Invoices") },
+                title = { Text(uiState.categoryName ?: "Invoices") },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(

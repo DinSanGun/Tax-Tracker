@@ -212,6 +212,7 @@ fun TaxTrackerNavHost(
 
             // Load invoices whenever the categoryId changes (or first time we enter)
             androidx.compose.runtime.LaunchedEffect(categoryId) {
+                viewModel.loadCategoryHeader(categoryId)
                 viewModel.loadInvoices(categoryId)
             }
 
