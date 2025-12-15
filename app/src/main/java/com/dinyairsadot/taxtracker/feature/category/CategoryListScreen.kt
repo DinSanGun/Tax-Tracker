@@ -79,7 +79,7 @@ fun CategoryListScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Categories") }
+                title = { Text("Bills & Taxes") }
             )
         },
         floatingActionButton = {
