@@ -230,60 +230,72 @@ private fun InvoiceItem(
             .clickable(onClick = onClick),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            // Left content (everything that should flow top->bottom)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(end = 84.dp) // reserve space for amount + delete so they never overlap text
             ) {
                 Text(
                     text = invoice.invoiceNumber.ifBlank { "Invoice #${invoice.id}" },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
+
+                Spacer(modifier = Modifier.padding(top = 4.dp))
+
+                Text(
+                    text = when (invoice.paymentStatus) {
+                        com.dinyairsadot.taxtracker.core.domain.PaymentStatus.PAID_FULL -> "Paid in full"
+                        com.dinyairsadot.taxtracker.core.domain.PaymentStatus.NOT_PAID -> "Not paid"
+                        com.dinyairsadot.taxtracker.core.domain.PaymentStatus.PAID_CREDIT -> "Paid with credit"
+                    },
+                    style = MaterialTheme.typography.bodySmall
+                )
+
+                invoice.dueDateText?.let { due ->
                     Text(
-                        text = invoice.amount.toString(),
-                        style = MaterialTheme.typography.titleMedium
+                        text = "Due: $due",
+                        style = MaterialTheme.typography.bodySmall
                     )
-                    IconButton(onClick = onDeleteClick) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = "Delete invoice"
-                        )
-                    }
+                }
+
+                invoice.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+                    Spacer(modifier = Modifier.padding(top = 4.dp))
+                    Text(
+                        text = notes,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.padding(top = 4.dp))
-
-            Text(
-                text = when (invoice.paymentStatus) {
-                    com.dinyairsadot.taxtracker.core.domain.PaymentStatus.PAID_FULL -> "Paid in full"
-                    com.dinyairsadot.taxtracker.core.domain.PaymentStatus.NOT_PAID -> "Not paid"
-                    com.dinyairsadot.taxtracker.core.domain.PaymentStatus.PAID_CREDIT -> "Paid with credit"
-                },
-                style = MaterialTheme.typography.bodySmall
-            )
-
-            invoice.dueDateText?.let { due ->
+            // Right content pinned to the vertical center of the entire card content
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    text = "Due: $due",
-                    style = MaterialTheme.typography.bodySmall
+                    text = formatAmountILS(invoice.amount),
+                    style = MaterialTheme.typography.titleMedium
                 )
-            }
-
-            invoice.notes?.takeIf { it.isNotBlank() }?.let { notes ->
-                Spacer(modifier = Modifier.padding(top = 4.dp))
-                Text(
-                    text = notes,
-                    style = MaterialTheme.typography.bodySmall
-                )
+                IconButton(onClick = onDeleteClick) {
+                    Icon(
+                        imageVector = Icons.Default.Delete,
+                        contentDescription = "Delete invoice",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
 }
+
+private fun formatAmountILS(amount: Double): String {
+    return "₪%.2f".format(amount)
+}
+
