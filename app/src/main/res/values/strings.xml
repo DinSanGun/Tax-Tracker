@@ -319,6 +319,12 @@
     <string name="language_settings">Language Settings</string>
     <string name="select_language">Select Language</string>
 
+    <!-- Text Size -->
+    <string name="text_size_label">Text size</string>
+    <string name="text_size_normal">Normal</string>
+    <string name="text_size_large">Large</string>
+    <string name="text_size_extra_large">Extra Large</string>
+
     <!-- About -->
     <string name="about">About</string>
     <string name="about_tagline">Simple Bill &amp; Tax Tracker</string>

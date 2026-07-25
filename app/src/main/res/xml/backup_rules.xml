@@ -6,4 +6,5 @@
     <include domain="database" path="clear_ledger_database-wal" />
     <include domain="sharedpref" path="language_prefs" />
     <include domain="sharedpref" path="seeding_prefs" />
+    <include domain="sharedpref" path="text_size_prefs" />
 </full-backup-content>

@@ -2,6 +2,7 @@ package com.dinyairsadot.clearledger.feature.category
 
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dinyairsadot.clearledger.core.domain.AppTextSize
 
 @Composable
 fun CategoryListRoute(
@@ -10,6 +11,8 @@ fun CategoryListRoute(
     onEditCategoryClick: (Long) -> Unit,
     onLanguageSettingsClick: () -> Unit,
     onAboutClick: () -> Unit,
+    currentTextSize: AppTextSize,
+    onTextSizeSelected: (AppTextSize) -> Unit,
     viewModel: CategoryListViewModel,
     showCategoryAddedMessage: Boolean = false,
     onCategoryAddedMessageShown: () -> Unit = {}
@@ -34,6 +37,8 @@ fun CategoryListRoute(
         },
         onLanguageSettingsClick = onLanguageSettingsClick,
         onAboutClick = onAboutClick,
+        currentTextSize = currentTextSize,
+        onTextSizeSelected = onTextSizeSelected,
         isReorderMode = uiState.isReorderMode,
         onEnterReorderMode = { viewModel.enterReorderMode() },
         onExitReorderMode = { viewModel.exitReorderMode() },

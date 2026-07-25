@@ -22,6 +22,8 @@ import androidx.navigation.compose.rememberNavController
 import com.dinyairsadot.clearledger.core.data.DefaultCategorySeeder
 import com.dinyairsadot.clearledger.core.data.LanguagePreferenceManager
 import com.dinyairsadot.clearledger.core.data.SeedingPreferenceManager
+import com.dinyairsadot.clearledger.core.data.TextSizePreferenceManager
+import com.dinyairsadot.clearledger.core.domain.AppTextSize
 import com.dinyairsadot.clearledger.core.data.ClearLedgerDatabase
 import com.dinyairsadot.clearledger.core.data.repositories.RoomCategoryRepository
 import com.dinyairsadot.clearledger.core.data.repositories.RoomInvoiceRepository
@@ -58,7 +60,8 @@ class MainActivity : ComponentActivity() {
         val categoryRepository = RoomCategoryRepository(database.categoryDao())
         val invoiceRepository = RoomInvoiceRepository(database.invoiceDao())
         val seedingPreferenceManager = SeedingPreferenceManager(this)
-        
+        val textSizePreferenceManager = TextSizePreferenceManager(this)
+
         setContent {
             val configuration = LocalConfiguration.current
             val composeLayoutDir = configuration.layoutDirection
@@ -70,9 +73,14 @@ class MainActivity : ComponentActivity() {
                 LayoutDirection.Ltr
             }
 
+            // Remember the preference manager and hoist the current text size preference so it
+            // lives above ClearLedgerTheme (which only selects a Typography, never persists).
+            val rememberedTextSizePrefs = remember { textSizePreferenceManager }
+            var textSize by remember { mutableStateOf(rememberedTextSizePrefs.getTextSize()) }
+
             // Explicitly provide layout direction to Compose
             CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
-                ClearLedgerTheme {
+                ClearLedgerTheme(textSize = textSize) {
                     val navController = rememberNavController()
 
                     // Remember repositories and preference manager to avoid recreating them on recomposition
@@ -130,7 +138,12 @@ class MainActivity : ComponentActivity() {
                             ClearLedgerNavHost(
                                 navController = navController,
                                 categoryRepository = rememberedCategoryRepo,
-                                invoiceRepository = rememberedInvoiceRepo
+                                invoiceRepository = rememberedInvoiceRepo,
+                                currentTextSize = textSize,
+                                onTextSizeSelected = { selected ->
+                                    rememberedTextSizePrefs.setTextSize(selected)
+                                    textSize = selected
+                                }
                             )
                         }
                     }

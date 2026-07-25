@@ -319,6 +319,12 @@
     <string name="language_settings">הגדרות שפה</string>
     <string name="select_language">בחר שפה</string>
 
+    <!-- Text Size -->
+    <string name="text_size_label">גודל טקסט</string>
+    <string name="text_size_normal">רגיל</string>
+    <string name="text_size_large">גדול</string>
+    <string name="text_size_extra_large">גדול מאוד</string>
+
     <!-- About -->
     <string name="about">אודות</string>
     <string name="about_tagline">מעקב פשוט לחשבוניות ומסים</string>

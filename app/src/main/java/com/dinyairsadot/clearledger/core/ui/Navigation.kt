@@ -55,6 +55,7 @@ import com.dinyairsadot.clearledger.feature.invoice.InvoiceListUiState
 import com.dinyairsadot.clearledger.feature.invoice.InvoiceUi
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.dinyairsadot.clearledger.core.domain.AppTextSize
 import com.dinyairsadot.clearledger.core.domain.Category
 import com.dinyairsadot.clearledger.core.domain.CategoryRepository
 import com.dinyairsadot.clearledger.core.domain.InvoiceRepository
@@ -101,6 +102,8 @@ fun ClearLedgerNavHost(
     navController: NavHostController,
     categoryRepository: CategoryRepository,
     invoiceRepository: InvoiceRepository,
+    currentTextSize: AppTextSize,
+    onTextSizeSelected: (AppTextSize) -> Unit,
     modifier: androidx.compose.ui.Modifier = androidx.compose.ui.Modifier
 ) {
     NavHost(
@@ -145,6 +148,8 @@ fun ClearLedgerNavHost(
                 onAboutClick = {
                     navController.navigate(Screen.About.route)
                 },
+                currentTextSize = currentTextSize,
+                onTextSizeSelected = onTextSizeSelected,
                 viewModel = viewModel,
                 showCategoryAddedMessage = categoryAdded,
                 onCategoryAddedMessageShown = {

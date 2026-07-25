@@ -35,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -71,6 +72,7 @@ import com.dinyairsadot.clearledger.core.util.AllDataZipExporter
 import com.dinyairsadot.clearledger.core.util.backup.BackupPayload
 import com.dinyairsadot.clearledger.core.util.backup.BackupValidationResult
 import com.dinyairsadot.clearledger.core.util.backup.BackupZipExporter
+import com.dinyairsadot.clearledger.core.domain.AppTextSize
 import com.dinyairsadot.clearledger.core.util.CategoriesCsvLabels
 import com.dinyairsadot.clearledger.feature.invoice.rememberInvoiceCsvExportLabels
 import java.io.IOException
@@ -101,6 +103,8 @@ fun CategoryListScreen(
     onDeleteCategory: (Long) -> Unit,
     onLanguageSettingsClick: () -> Unit,
     onAboutClick: () -> Unit,
+    currentTextSize: AppTextSize,
+    onTextSizeSelected: (AppTextSize) -> Unit,
     isReorderMode: Boolean,
     onEnterReorderMode: () -> Unit,
     onExitReorderMode: () -> Unit,
@@ -113,6 +117,7 @@ fun CategoryListScreen(
     var pendingDeleteId by remember { mutableStateOf<Long?>(null) }
     var pendingRestorePayload by remember { mutableStateOf<BackupPayload?>(null) }
     var showResetConfirmDialog by remember { mutableStateOf(false) }
+    var showTextSizeDialog by remember { mutableStateOf(false) }
     var isFileOperationInProgress by remember { mutableStateOf(false) }
     val overflowMenuState = rememberAnimatedDropdownMenuState()
     val context = LocalContext.current
@@ -306,6 +311,13 @@ fun CategoryListScreen(
                                 onClick = {
                                     overflowMenuState.dismiss()
                                     onLanguageSettingsClick()
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.text_size_label)) },
+                                onClick = {
+                                    overflowMenuState.dismiss()
+                                    showTextSizeDialog = true
                                 }
                             )
                             DropdownMenuItem(
@@ -517,6 +529,51 @@ fun CategoryListScreen(
                         )
                     ) {
                         Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
+        }
+
+        if (showTextSizeDialog) {
+            AlertDialog(
+                onDismissRequest = { showTextSizeDialog = false },
+                title = { Text(stringResource(R.string.text_size_label)) },
+                text = {
+                    Column {
+                        TextSizeOptionRow(
+                            label = stringResource(R.string.text_size_normal),
+                            selected = currentTextSize == AppTextSize.NORMAL,
+                            onClick = {
+                                onTextSizeSelected(AppTextSize.NORMAL)
+                                showTextSizeDialog = false
+                            }
+                        )
+                        TextSizeOptionRow(
+                            label = stringResource(R.string.text_size_large),
+                            selected = currentTextSize == AppTextSize.LARGE,
+                            onClick = {
+                                onTextSizeSelected(AppTextSize.LARGE)
+                                showTextSizeDialog = false
+                            }
+                        )
+                        TextSizeOptionRow(
+                            label = stringResource(R.string.text_size_extra_large),
+                            selected = currentTextSize == AppTextSize.EXTRA_LARGE,
+                            onClick = {
+                                onTextSizeSelected(AppTextSize.EXTRA_LARGE)
+                                showTextSizeDialog = false
+                            }
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = { showTextSizeDialog = false },
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Text(stringResource(R.string.close))
                     }
                 }
             )
@@ -776,6 +833,29 @@ private fun CategoryItem(
                 }
             }
         }
+    }
+}
+
+/**
+ * A single "Normal"/"Large" choice row in the text size dialog. Tapping the row
+ * (label or radio button) immediately applies that choice via [onClick].
+ */
+@Composable
+private fun TextSizeOptionRow(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(selected = selected, onClick = onClick)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = label, style = MaterialTheme.typography.bodyLarge)
     }
 }
 

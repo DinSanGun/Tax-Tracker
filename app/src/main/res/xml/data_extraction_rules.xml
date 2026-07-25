@@ -7,6 +7,7 @@
         <include domain="database" path="clear_ledger_database-wal" />
         <include domain="sharedpref" path="language_prefs" />
         <include domain="sharedpref" path="seeding_prefs" />
+        <include domain="sharedpref" path="text_size_prefs" />
     </cloud-backup>
     <device-transfer>
         <include domain="database" path="clear_ledger_database" />
@@ -14,5 +15,6 @@
         <include domain="database" path="clear_ledger_database-wal" />
         <include domain="sharedpref" path="language_prefs" />
         <include domain="sharedpref" path="seeding_prefs" />
+        <include domain="sharedpref" path="text_size_prefs" />
     </device-transfer>
 </data-extraction-rules>
