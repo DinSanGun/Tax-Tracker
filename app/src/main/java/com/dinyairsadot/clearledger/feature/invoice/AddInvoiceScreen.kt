@@ -541,35 +541,11 @@ fun AddInvoiceScreen(
             )
 
             // Service period (optional)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.service_period_mode_label) + ":",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
-                TextButton(
-                    onClick = { servicePeriodMode = ServicePeriodMode.MONTH },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
-                ) {
-                    Text(
-                        stringResource(R.string.service_period_mode_month),
-                        fontWeight = if (servicePeriodMode == ServicePeriodMode.MONTH) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-                TextButton(
-                    onClick = { servicePeriodMode = ServicePeriodMode.DATE },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
-                ) {
-                    Text(
-                        stringResource(R.string.service_period_mode_dates),
-                        fontWeight = if (servicePeriodMode == ServicePeriodMode.DATE) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-            }
+            ServicePeriodModeSelector(
+                selectedMode = servicePeriodMode,
+                onModeSelected = { servicePeriodMode = it },
+                modifier = Modifier.fillMaxWidth()
+            )
 
             Box(
                 modifier = Modifier

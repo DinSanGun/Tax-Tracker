@@ -4,19 +4,23 @@ package com.dinyairsadot.clearledger.feature.invoice
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import android.app.DatePickerDialog
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -32,7 +36,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextRange
@@ -119,6 +125,106 @@ fun ServicePeriodInput(
                 endMonthError = endMonthError
             )
         }
+    }
+}
+
+/**
+ * Toggle between [ServicePeriodMode.MONTH] and [ServicePeriodMode.DATE].
+ *
+ * At normal font scale the two mode buttons sit side by side, at their natural
+ * (compact) content width, aligned to the reading/start side of the form.
+ * At increased accessibility font scale (>= [STACKED_LAYOUT_FONT_SCALE_THRESHOLD])
+ * they stack vertically instead, still aligned to the start side, so long
+ * localized labels (e.g. Hebrew "תאריכים מדויקים") never split into partial-word
+ * fragments.
+ */
+private const val STACKED_LAYOUT_FONT_SCALE_THRESHOLD = 1.3f
+
+@Composable
+fun ServicePeriodModeSelector(
+    selectedMode: ServicePeriodMode,
+    onModeSelected: (ServicePeriodMode) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val useStackedLayout = LocalDensity.current.fontScale >= STACKED_LAYOUT_FONT_SCALE_THRESHOLD
+    // Space below the selector, before the month/date controls that follow it.
+    // Kept identical for both layouts so the gap to the next control never changes
+    // depending on font scale.
+    val containerModifier = modifier
+        .fillMaxWidth()
+        .padding(bottom = 12.dp)
+
+    if (useStackedLayout) {
+        Column(
+            modifier = containerModifier,
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            ServicePeriodModeButton(
+                label = stringResource(R.string.service_period_mode_month),
+                selected = selectedMode == ServicePeriodMode.MONTH,
+                onClick = { onModeSelected(ServicePeriodMode.MONTH) },
+                modifier = Modifier.wrapContentWidth()
+            )
+            ServicePeriodModeButton(
+                label = stringResource(R.string.service_period_mode_dates),
+                selected = selectedMode == ServicePeriodMode.DATE,
+                onClick = { onModeSelected(ServicePeriodMode.DATE) },
+                modifier = Modifier.wrapContentWidth()
+            )
+        }
+    } else {
+        Row(
+            modifier = containerModifier,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ServicePeriodModeButton(
+                label = stringResource(R.string.service_period_mode_month),
+                selected = selectedMode == ServicePeriodMode.MONTH,
+                onClick = { onModeSelected(ServicePeriodMode.MONTH) }
+            )
+            ServicePeriodModeButton(
+                label = stringResource(R.string.service_period_mode_dates),
+                selected = selectedMode == ServicePeriodMode.DATE,
+                onClick = { onModeSelected(ServicePeriodMode.DATE) }
+            )
+        }
+    }
+}
+
+/**
+ * Compact rounded outlined button used by [ServicePeriodModeSelector]. Uses its
+ * natural content width (never stretched) so the two choices read as small
+ * selectable controls rather than large tap targets with floating centered text.
+ */
+@Composable
+private fun ServicePeriodModeButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val borderColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
+    val borderWidth = if (selected) 2.dp else 1.dp
+    val containerColor = if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent
+
+    OutlinedButton(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(borderWidth, borderColor),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = containerColor,
+            contentColor = MaterialTheme.colorScheme.onSurface
+        )
+    ) {
+        Text(
+            text = label,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            softWrap = false
+        )
     }
 }
 

@@ -511,7 +511,15 @@ private fun SearchBar(
                     value = searchQuery,
                     onValueChange = onSearchQueryChange,
                     modifier = Modifier.weight(1f),
-                    placeholder = { Text(stringResource(placeholderRes)) },
+                    placeholder = {
+                        Text(
+                            text = stringResource(placeholderRes),
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = Color.Transparent,

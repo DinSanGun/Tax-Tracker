@@ -23,7 +23,7 @@
     <string name="delete_category">למחוק קטגוריה?</string>
     <string name="delete_category_confirmation">האם אתה בטוח שברצונך למחוק קטגוריה זו? כל הנתונים הקשורים אליה (כגון חשבוניות) יוסרו.</string>
     <string name="no_categories_yet">אין עדיין קטגוריות.\nהקש + כדי להוסיף את הקטגוריה הראשונה שלך.</string>
-    <string name="invoices_summary_dynamic">%2$d חשבוניות בסך הכל · %1$d לא שולמו</string>
+    <string name="invoices_summary_dynamic">%2$d חשבוניות · %1$d לא שולמו</string>
     <string name="reorder_categories">סידור קטגוריות</string>
     <string name="done">סיום</string>
     <string name="move_up">העבר למעלה</string>
@@ -234,7 +234,6 @@
 
     <!-- Service Period hybrid input -->
     <string name="service_period">תקופת שירות</string>
-    <string name="service_period_mode_label">תקופת שירות</string>
     <string name="service_period_mode_month">חודשית</string>
     <string name="service_period_mode_dates">תאריכים מדויקים</string>
     <string name="service_period_month_label">חודש *</string>

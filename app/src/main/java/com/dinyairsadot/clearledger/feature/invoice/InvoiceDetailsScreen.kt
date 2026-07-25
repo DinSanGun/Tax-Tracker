@@ -9,13 +9,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,7 +25,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import com.dinyairsadot.clearledger.core.domain.DocumentType
@@ -33,7 +36,6 @@ import com.dinyairsadot.clearledger.feature.invoice.formatServicePeriodForDispla
 import com.dinyairsadot.clearledger.core.domain.PaymentStatus
 import com.dinyairsadot.clearledger.core.domain.PaymentMethodOption
 import com.dinyairsadot.clearledger.core.ui.categoryTopAppBarColors
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import com.dinyairsadot.clearledger.R
 
@@ -52,7 +54,13 @@ fun InvoiceDetailsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.invoice_details)) },
+                title = {
+                    Text(
+                        text = stringResource(R.string.invoice_details),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
@@ -62,14 +70,12 @@ fun InvoiceDetailsScreen(
                     }
                 },
                 actions = {
-                    // Ensures the action uses the same contrast-aware color as the title/icons
-                    TextButton(
-                        onClick = onEditClick,
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = LocalContentColor.current
+                    // IconButton/Icon inherit the top app bar's contrast-aware content color.
+                    IconButton(onClick = onEditClick) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = stringResource(R.string.edit_invoice)
                         )
-                    ) {
-                        Text(stringResource(R.string.edit_invoice))
                     }
                 },
                 colors = categoryTopAppBarColors(categoryColorHex)
@@ -100,16 +106,21 @@ fun InvoiceDetailsScreen(
                         val invoiceNumberText = invoice.invoiceNumber.ifBlank {
                             stringResource(R.string.invoice_number_fallback, invoice.id)
                         }
-                        Row(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 text = stringResource(R.string.invoice_number_label, "").trimEnd(),
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
-                                text = invoiceNumberText,
+                                text = keepLastTwoCharactersTogetherForDisplay(invoiceNumberText),
                                 style = MaterialTheme.typography.titleLarge,
-                                modifier = Modifier.padding(start = 4.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 2.dp)
+                                    // Expose the original, unmodified invoice number to
+                                    // accessibility services (no invisible joiner character).
+                                    .semantics { contentDescription = invoiceNumberText }
                             )
                         }
 
@@ -299,6 +310,23 @@ private fun DetailFieldRow(
                 .padding(start = 4.dp)
         )
     }
+}
+
+/**
+ * Inserts an invisible Unicode WORD JOINER (`\u2060`) between the final two
+ * characters of [value] so that, if the displayed invoice number needs to
+ * wrap onto a second line, the break never leaves just one lone character
+ * behind. This is a display-only concern: it never touches the stored
+ * invoice number, and callers must pass the original string as the
+ * accessibility content description.
+ */
+private fun keepLastTwoCharactersTogetherForDisplay(value: String): String {
+    if (value.length < 2) return value
+
+    val splitIndex = value.length - 1
+    return value.substring(0, splitIndex) +
+        "\u2060" +
+        value.substring(splitIndex)
 }
 
 @Composable

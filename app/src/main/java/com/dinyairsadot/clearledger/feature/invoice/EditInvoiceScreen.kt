@@ -7,7 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -51,7 +50,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -619,35 +617,11 @@ fun EditInvoiceScreen(
                 isFirstSection = false
             )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(R.string.service_period_mode_label) + ":",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(end = 8.dp)
-                )
-                TextButton(
-                    onClick = { servicePeriodMode = ServicePeriodMode.MONTH },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
-                ) {
-                    Text(
-                        stringResource(R.string.service_period_mode_month),
-                        fontWeight = if (servicePeriodMode == ServicePeriodMode.MONTH) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-                TextButton(
-                    onClick = { servicePeriodMode = ServicePeriodMode.DATE },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
-                ) {
-                    Text(
-                        stringResource(R.string.service_period_mode_dates),
-                        fontWeight = if (servicePeriodMode == ServicePeriodMode.DATE) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-            }
+            ServicePeriodModeSelector(
+                selectedMode = servicePeriodMode,
+                onModeSelected = { servicePeriodMode = it },
+                modifier = Modifier.fillMaxWidth()
+            )
 
             Box(
                 modifier = Modifier
