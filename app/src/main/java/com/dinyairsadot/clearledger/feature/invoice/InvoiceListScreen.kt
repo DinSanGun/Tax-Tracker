@@ -45,7 +45,9 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -89,6 +91,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import com.dinyairsadot.clearledger.core.util.InvoiceCsvExportLabels
+import com.dinyairsadot.clearledger.core.util.ShareExportUtil
 import com.dinyairsadot.clearledger.core.util.Utf8CsvWriter
 import com.dinyairsadot.clearledger.core.ui.AnimatedDropdownMenu
 import com.dinyairsadot.clearledger.core.ui.SwipeDismissSnackbarHost
@@ -150,6 +153,9 @@ fun InvoiceListScreen(
     val noInvoicesToExportMessage = stringResource(R.string.no_invoices_to_export)
     val exportCompletedMessage = stringResource(R.string.export_completed)
     val exportFailedMessage = stringResource(R.string.export_failed)
+    val shareActionLabel = stringResource(R.string.share)
+    val shareExportChooserTitle = stringResource(R.string.share_export_chooser_title)
+    val shareFailedMessage = stringResource(R.string.share_failed)
     var pendingDeleteInvoiceId by remember { mutableStateOf<Long?>(null) }
     var isExporting by remember { mutableStateOf(false) }
     val sortMenuState = rememberAnimatedDropdownMenuState()
@@ -181,12 +187,38 @@ fun InvoiceListScreen(
             isExporting = true
             try {
                 val csv = onBuildCsvContent(csvExportLabels)
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use { stream ->
+                val shareUri = withContext(Dispatchers.IO) {
+                    // Stage the same bytes in the app cache so they can be re-read for sharing,
+                    // then copy them into the user-chosen SAF destination unchanged.
+                    val cacheFile = ShareExportUtil.prepareCacheFile(
+                        context,
+                        "clear_ledger_export_${LocalDate.now()}.csv"
+                    )
+                    cacheFile.outputStream().use { stream ->
                         Utf8CsvWriter.writeUtf8CsvWithBom(stream, csv)
+                    }
+                    context.contentResolver.openOutputStream(uri)?.use { destination ->
+                        cacheFile.inputStream().use { it.copyTo(destination) }
                     } ?: throw IOException("Failed to open output stream")
+                    ShareExportUtil.shareUriFor(context, cacheFile)
                 }
-                snackbarHostState.showSnackbar(exportCompletedMessage)
+                val snackbarResult = snackbarHostState.showSnackbar(
+                    message = exportCompletedMessage,
+                    actionLabel = shareActionLabel,
+                    duration = SnackbarDuration.Long
+                )
+                if (snackbarResult == SnackbarResult.ActionPerformed) {
+                    try {
+                        ShareExportUtil.shareFile(
+                            context,
+                            shareUri,
+                            "text/csv",
+                            shareExportChooserTitle
+                        )
+                    } catch (_: Exception) {
+                        snackbarHostState.showSnackbar(shareFailedMessage)
+                    }
+                }
             } catch (_: Exception) {
                 snackbarHostState.showSnackbar(exportFailedMessage)
             } finally {

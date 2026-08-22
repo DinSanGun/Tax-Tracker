@@ -35,7 +35,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -69,6 +71,7 @@ import com.dinyairsadot.clearledger.core.ui.AppSnackbar
 import com.dinyairsadot.clearledger.core.ui.rememberAnimatedDropdownMenuState
 import com.dinyairsadot.clearledger.core.util.AllDataZipExporter
 import com.dinyairsadot.clearledger.core.util.CategoriesCsvLabels
+import com.dinyairsadot.clearledger.core.util.ShareExportUtil
 import com.dinyairsadot.clearledger.feature.invoice.rememberInvoiceCsvExportLabels
 import java.io.IOException
 import java.time.LocalDate
@@ -130,6 +133,9 @@ fun CategoryListScreen(
     val noDataToExportMessage = stringResource(R.string.no_data_to_export)
     val exportCompletedMessage = stringResource(R.string.export_completed)
     val exportFailedMessage = stringResource(R.string.export_failed)
+    val shareActionLabel = stringResource(R.string.share)
+    val shareExportChooserTitle = stringResource(R.string.share_export_chooser_title)
+    val shareFailedMessage = stringResource(R.string.share_failed)
 
     LaunchedEffect(showCategoryAddedMessage) {
         if (showCategoryAddedMessage) {
@@ -166,17 +172,43 @@ fun CategoryListScreen(
             isFileOperationInProgress = true
             try {
                 val allData = viewModel.loadAllDataForExport()
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                val shareUri = withContext(Dispatchers.IO) {
+                    // Stage the same ZIP bytes in the app cache so they can be re-read for
+                    // sharing, then copy them into the user-chosen SAF destination unchanged.
+                    val cacheFile = ShareExportUtil.prepareCacheFile(
+                        context,
+                        "clear_ledger_all_data_export_${LocalDate.now()}.zip"
+                    )
+                    cacheFile.outputStream().use { outputStream ->
                         AllDataZipExporter.writeZip(
                             outputStream,
                             allData,
                             invoiceCsvLabels,
                             categoriesCsvLabels
                         )
+                    }
+                    context.contentResolver.openOutputStream(uri)?.use { destination ->
+                        cacheFile.inputStream().use { it.copyTo(destination) }
                     } ?: throw IOException("Failed to open output stream")
+                    ShareExportUtil.shareUriFor(context, cacheFile)
                 }
-                snackbarHostState.showSnackbar(exportCompletedMessage)
+                val snackbarResult = snackbarHostState.showSnackbar(
+                    message = exportCompletedMessage,
+                    actionLabel = shareActionLabel,
+                    duration = SnackbarDuration.Long
+                )
+                if (snackbarResult == SnackbarResult.ActionPerformed) {
+                    try {
+                        ShareExportUtil.shareFile(
+                            context,
+                            shareUri,
+                            "application/zip",
+                            shareExportChooserTitle
+                        )
+                    } catch (_: Exception) {
+                        snackbarHostState.showSnackbar(shareFailedMessage)
+                    }
+                }
             } catch (_: Exception) {
                 snackbarHostState.showSnackbar(exportFailedMessage)
             } finally {
@@ -274,7 +306,11 @@ fun CategoryListScreen(
             SwipeDismissSnackbarHost(
                 hostState = snackbarHostState,
                 snackbar = { snackbarData ->
-                    AppSnackbar(message = snackbarData.visuals.message)
+                    AppSnackbar(
+                        message = snackbarData.visuals.message,
+                        actionLabel = snackbarData.visuals.actionLabel,
+                        onActionClick = { snackbarData.performAction() }
+                    )
                 }
             )
         }

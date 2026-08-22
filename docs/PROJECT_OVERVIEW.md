@@ -17,12 +17,14 @@ For the pre-release execution plan, see `docs/LAUNCH_PLAN.md`. For architecture 
    - Category list → add / edit / delete category
    - Manual reorder mode (persisted `orderIndex`) — Category list overflow → Order Categories
    - **Export all data** → Category list overflow → Export — ZIP via Storage Access Framework (`categories.csv` + invoice CSVs per category with invoices) — human-readable, not for restore
+   - After export completes, an optional **Share** action on the confirmation snackbar opens the standard Android Share Sheet for that ZIP
    - **Settings** (gear icon on Category list) → Language, Text size, Create backup, Restore from backup, Reset all data, About / Privacy Policy
 
 2. **Invoice management**
    - Select category → invoice list (search, filter, sort)
    - Add / view details / edit / delete invoice
    - **Export** → localized CSV of currently visible invoices via SAF
+   - After export completes, an optional **Share** action on the confirmation snackbar opens the standard Android Share Sheet for that CSV
 
 3. **Navigation pattern**
    - Category list is the start destination
@@ -83,6 +85,7 @@ com.dinyairsadot.clearledger/
 │       ├── InvoiceCsvExporter.kt, InvoiceCsvExportLabels.kt
 │       ├── Utf8CsvWriter.kt, AllDataZipExporter.kt
 │       ├── CategoriesCsvLabels.kt, AllExportData.kt
+│       ├── ShareExportUtil.kt   # Share Sheet: FileProvider Uri + ACTION_SEND chooser
 │       └── backup/
 │           ├── BackupFormat.kt, BackupDtos.kt, BackupMapper.kt
 │           ├── BackupZipExporter.kt, BackupZipImporter.kt
@@ -273,6 +276,8 @@ ViewModels expose immutable `UiState` data classes via `StateFlow`.
 - File I/O and SAF launchers live in Compose screens; ViewModels supply data / CSV strings
 - **Known limitation:** Google Sheets Android may misread mixed English-header / Hebrew-data CSV; desktop Sheets and LibreOffice are fine
 
+**Share Sheet (Aug 2026):** After either export succeeds, the same bytes written to SAF are also staged in `cacheDir/exports/` and exposed as a temporary `content://` Uri via `androidx.core.content.FileProvider` (`core/util/ShareExportUtil.kt`). A **Share** action on the success snackbar opens the standard Android Share Sheet (`Intent.ACTION_SEND` + `Intent.createChooser`) with read permission granted only to the app the user picks. No `file://` Uri, no broad storage permission, and no direct Gmail/Drive/WhatsApp integration — the chooser just lists installed apps that accept the file's MIME type.
+
 ---
 
 ## M. Backup and Restore (implemented)
@@ -309,6 +314,7 @@ ViewModels expose immutable `UiState` data classes via `StateFlow`.
 - UI polish pass (May–Jun 2026)
 - Pre-launch safety refactor (Jun 2026)
 - **User-facing export:** invoice-list CSV + category-list all-data ZIP (Jun 2026)
+- **Android Share Sheet support for export** (Aug 2026): optional Share action after export, via `FileProvider` + `ACTION_SEND`
 - **Backup and restore:** create backup + full-replace restore (Jun 2026)
 - **Targeted unit tests** (S9), **GitHub Actions CI** (S10), **release polish** (S11)
 - **Release identity** (`com.dinyairsadot.clearledger`, v1.0.0, launcher icon) and **documentation polish** (S12)
@@ -317,6 +323,7 @@ ViewModels expose immutable `UiState` data classes via `StateFlow`.
 **Not yet implemented:**
 - Play Store production release
 - Cloud sync, encryption, automatic backup, selective merge restore
+- Receipt image/PDF attachments (next launch-prep stage)
 
 **Pre-release focus (see `docs/LAUNCH_PLAN.md` S9–S17):**
 - **Done:** S9 tests, S10 CI, S11 release polish, S12 docs, S13 release identity, S14 repo deliverables (privacy policy, store materials, screenshots, icon)

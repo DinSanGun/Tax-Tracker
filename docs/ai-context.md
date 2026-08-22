@@ -1,6 +1,6 @@
 # Clear Ledger (Android) — AI Context (Cursor)
 
-_Last updated: 2026-06-24_
+_Last updated: 2026-08-22_
 
 Concise working context for AI-assisted development. For the full overview see `docs/PROJECT_OVERVIEW.md`; for architecture patterns see `docs/ARCHITECTURE.md`; for release planning see `docs/LAUNCH_PLAN.md` and `docs/RELEASE.md`.
 
@@ -13,7 +13,7 @@ Local-first Android app for tracking **bills / taxes by category**. Users manage
 Supports **Hebrew and English** with manual language switching and RTL/LTR layout.
 
 **Data portability (all implemented):**
-- **Export** — localized CSV/ZIP for humans/spreadsheets (not for restore)
+- **Export** — localized CSV/ZIP for humans/spreadsheets (not for restore); after a successful export, an optional **Share** action opens the Android Share Sheet for that exact file
 - **Backup** — restore-ready ZIP with `backup.json`
 - **Restore** — full replace of local app data from a backup ZIP
 
@@ -26,6 +26,7 @@ Supports **Hebrew and English** with manual language switching and RTL/LTR layou
 - Room (SQLite) v14 — `RoomCategoryRepository`, `RoomInvoiceRepository`, `RoomBackupRestoreRepository`
 - No DI framework; repos wired in `MainActivity` / ViewModel factories
 - Export/backup: pure Kotlin in `core/util/` and `core/util/backup/`; SAF + file I/O in Compose screens
+- Share Sheet: `androidx.core.content.FileProvider` (manifest + `res/xml/file_paths.xml`) + `core/util/ShareExportUtil.kt`; `Intent.ACTION_SEND` / `Intent.createChooser` in Compose screens
 - Gradle KTS with version catalog (`libs.*`)
 
 ---
@@ -39,12 +40,13 @@ Supports **Hebrew and English** with manual language switching and RTL/LTR layou
 | `core/domain/Models.kt` | Domain contracts and invariants |
 | `core/data/ClearLedgerDatabase.kt` | Migrations — **do not change casually** |
 | `feature/invoice/InvoiceListViewModel.kt` | Search/filter/sort pipeline; `buildCsvContent()` |
-| `feature/invoice/InvoiceListScreen.kt` | List UI, filter sheet, invoice CSV export SAF |
+| `feature/invoice/InvoiceListScreen.kt` | List UI, filter sheet, invoice CSV export SAF + Share action |
 | `feature/category/CategoryListViewModel.kt` | Category CRUD, reorder, export/backup/restore |
-| `feature/category/CategoryListScreen.kt` | Category list UI; export-all-data SAF; overflow menu now only Export + Order categories |
+| `feature/category/CategoryListScreen.kt` | Category list UI; export-all-data SAF + Share action; overflow menu now only Export + Order categories |
 | `feature/settings/SettingsScreen.kt` | Settings hub (gear icon on Category list); backup/restore/reset SAF + dialogs; entry points to Language/Text size/About — shares `CategoryListViewModel` with Category list |
 | `core/util/InvoiceCsvExporter.kt` | Pure Kotlin invoice CSV generation |
 | `core/util/AllDataZipExporter.kt` | Pure Kotlin ZIP (categories.csv + invoice CSVs) |
+| `core/util/ShareExportUtil.kt` | Stages export bytes in cache, mints `FileProvider` Uri, opens Share Sheet |
 | `core/util/backup/BackupZipExporter.kt` | Pure Kotlin backup ZIP writer |
 | `core/util/backup/BackupZipImporter.kt` | Pure Kotlin backup ZIP reader |
 | `core/util/backup/BackupValidator.kt` | Defensive backup payload validation |
@@ -137,6 +139,13 @@ Invoice CSV export uses **`visibleInvoices`** (and category name/titles from UiS
 ### Google Sheets Android
 - Known limitation: may misread valid UTF-8 CSV (English headers + Hebrew data). **Do not add CSV encoding hacks.** LibreOffice / desktop Sheets are the target. XLSX is a possible future improvement.
 
+### Share Sheet (Aug 2026, additive on top of export — do not regress)
+- Both export flows stage the same bytes written to SAF in `context.cacheDir/exports/` first, then copy them into the SAF destination — so SAF output is byte-identical to before this feature.
+- `ShareExportUtil.prepareCacheFile()` clears prior staged files, `shareUriFor()` wraps the staged file via `FileProvider.getUriForFile()`, `shareFile()` fires `Intent.ACTION_SEND` + `Intent.createChooser` with `FLAG_GRANT_READ_URI_PERMISSION`.
+- Manifest declares `androidx.core.content.FileProvider` at `${applicationId}.fileprovider`, `exported="false"`; `res/xml/file_paths.xml` exposes only the `exports/` cache subdirectory.
+- Share action surfaces as an action button on the existing "Export completed" snackbar (`R.string.share`); tapping it launches the chooser for `text/csv` or `application/zip`. `AppSnackbar` gained optional `actionLabel`/`onActionClick` params (default no-op) to support this in `CategoryListScreen`'s custom snackbar renderer — other callers (`SettingsScreen`, `AboutScreen`) are unaffected.
+- **No** direct Gmail/Drive/WhatsApp integration, **no** Google auth, **no** custom sharing UI — only the standard system chooser.
+
 ---
 
 ## 8) Backup and restore behavior (do not regress)
@@ -170,6 +179,7 @@ Invoice CSV export uses **`visibleInvoices`** (and category name/titles from UiS
 | **Category orderIndex sorting** | Name-based sort breaks user order |
 | **Hidden category fields on update** | Round-trip `supplierName` / `pinnedDefaults` |
 | **Export scope & format** | Invoice export = visible only; ZIP skips empty invoice CSVs |
+| **Share Sheet scope** | Sharing must reuse existing export bytes as-is; do not add Gmail/Drive-specific APIs, Google auth, or a custom sharing UI |
 | **Backup format / restore semantics** | Full replace; validate before delete; preserve IDs |
 | **Localization** | Both `values/` and `values-iw/` |
 | **Back navigation (`popIfSafe` + BackHandler)** | `popIfSafe()` in Navigation.kt and `BackHandler(enabled = true)` at CategoryList root must stay; removing either re-exposes the blank-screen bug on rapid back presses |
@@ -194,11 +204,15 @@ Ask before: DB migrations, conflating export with backup, allowing CSV restore, 
 
 **Settings screen / navigation cleanup (Aug 2026):** Category list overflow menu reduced to Export + Order categories only; added Settings gear icon → new `SettingsScreen` (`feature/settings/`) grouping Language, Text size, Create backup, Restore from backup, Reset all data, About. Pure navigation/UI reorganization — backup/restore/reset reuse the same `CategoryListViewModel` calls via shared back-stack entry; language implementation itself unchanged.
 
+**Android Share Sheet support for export (Aug 2026):** Added optional sharing on top of the existing export flow (invoice-list CSV + category-list all-data ZIP) — see section 7 above for the do-not-regress details. `FileProvider` + `res/xml/file_paths.xml` added (minimum config, scoped to `cacheDir/exports/` only). No export format/content changes, no backup/restore changes, no Gmail/Drive integration. Next launch-prep stage: receipt image/PDF attachments.
+
 ---
 
 ## 11) Project status (Jun 2026)
 
-**Done:** Room, bilingual UI, custom fields, search/filter/sort, service period, category reorder, UI polish, pre-launch refactor, user-facing export (CSV + ZIP), backup creation, full-replace restore, targeted unit tests (S9), GitHub Actions CI (S10), release polish (S11), documentation polish (S12), release identity (S13 — `com.dinyairsadot.clearledger`, v1.0.0), pre-release polish pass (dialog colors, navigation fix, custom field UI, locale/seeding fixes).
+**Done:** Room, bilingual UI, custom fields, search/filter/sort, service period, category reorder, UI polish, pre-launch refactor, user-facing export (CSV + ZIP), Android Share Sheet support for export, backup creation, full-replace restore, targeted unit tests (S9), GitHub Actions CI (S10), release polish (S11), documentation polish (S12), release identity (S13 — `com.dinyairsadot.clearledger`, v1.0.0), pre-release polish pass (dialog colors, navigation fix, custom field UI, locale/seeding fixes).
+
+**Next launch-prep stage:** receipt image/PDF attachments (not started).
 
 **Pre-release (priority order — see `LAUNCH_PLAN` S9–S17):**
 1. **S9** — Targeted test hardening — **Done**

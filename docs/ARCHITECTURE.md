@@ -3,7 +3,7 @@
 Concise architecture reference for developers, code review, and interview prep.  
 For user flows and package layout detail, see `docs/PROJECT_OVERVIEW.md`. For release planning, see `docs/LAUNCH_PLAN.md`.
 
-_Last updated: 2026-06-24_
+_Last updated: 2026-08-22_
 
 ---
 
@@ -90,6 +90,10 @@ Back navigation uses a `popIfSafe()` helper (Navigation.kt) that checks `previou
 **Implementation:** Pure Kotlin in `core/util/` (`InvoiceCsvExporter`, `AllDataZipExporter`, `Utf8CsvWriter`). Labels follow **app locale only** (English or Hebrew). ViewModels supply data/strings; Compose screens write bytes via SAF.
 
 **Known limitation:** Google Sheets on Android may misread mixed English-header / Hebrew-data CSV. Do not add encoding hacks; LibreOffice and desktop Sheets are the target.
+
+### Share Sheet (Aug 2026)
+
+Both export flows above stage the same bytes they write to SAF in an app-cache file (`cacheDir/exports/`), then offer a **Share** action on the success snackbar. Sharing uses `androidx.core.content.FileProvider` (declared in `AndroidManifest.xml`, paths scoped to `cacheDir/exports/` via `res/xml/file_paths.xml`) to mint a temporary `content://` Uri, and `Intent.ACTION_SEND` + `Intent.createChooser` (see `core/util/ShareExportUtil.kt`) to open the standard Android Share Sheet with `FLAG_GRANT_READ_URI_PERMISSION`. No `file://` Uri is ever exposed, no broad storage permission is required, and there is no direct Gmail/Drive integration — the chooser simply lists whatever compatible apps are installed. The SAF save flow is unchanged; sharing is additive only.
 
 ---
 

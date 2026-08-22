@@ -16,6 +16,7 @@ The app targets real-world billing and tax workflows, including Israel-specific 
 - **Clear Ledger does not send your data to the developer** — no analytics or developer-operated upload
 - **Android system backup** — if enabled on your device, Android/Google may back up app data per your device and Google Account settings (see `docs/privacy-policy.md`)
 - **Manual export and backup via Storage Access Framework (SAF)** — files go only where you save them
+- **Optional sharing via the standard Android Share Sheet** — after an export completes, you may choose to share that exact file through any app you already have installed (email, messaging, cloud drives, etc.); the app has no direct Gmail/Drive integration and does not share anything automatically
 - **Backup files are plaintext JSON** — treat them like private financial documents
 
 ---
@@ -85,6 +86,7 @@ The app offers three distinct data portability features. **Do not confuse them:*
 - Localized English/Hebrew headers and display values; custom fields as CSV columns
 - UTF-8 with conditional BOM for spreadsheet compatibility (LibreOffice, desktop Google Sheets)
 - **Not for restore** — CSV/ZIP exports cannot be imported back into the app
+- **Share the exported file:** after a successful export, the confirmation snackbar includes a **Share** action that opens the standard Android Share Sheet for that exact file (`text/csv` or `application/zip`), via a secure temporary `content://` link — no separate Gmail/Drive integration, no broad storage permission
 
 #### Backup and restore (app data)
 - **Create backup:** writes a ZIP containing a single `backup.json` with restore-oriented data (categories, invoices, IDs, order, colors, custom fields, service period modes, currencies, raw enum values, ISO dates, metadata, format version)

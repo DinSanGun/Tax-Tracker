@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Paths exposed via FileProvider for sharing exported files through the Android Share Sheet.
+     Only the app's own cache "exports" subdirectory is exposed; no broader storage access. -->
+<paths>
+    <cache-path name="exports" path="exports/" />
+</paths>

@@ -77,6 +77,9 @@
     <string name="export_failed">הייצוא נכשל. אנא נסה שוב.</string>
     <string name="no_invoices_to_export">אין חשבוניות לייצוא</string>
     <string name="no_data_to_export">אין נתונים לייצוא</string>
+    <string name="share">שתף</string>
+    <string name="share_export_chooser_title">שיתוף הייצוא</string>
+    <string name="share_failed">לא ניתן לשתף את הקובץ. אנא נסה שוב.</string>
     <string name="create_backup">יצירת גיבוי</string>
     <string name="backup_created">הגיבוי נוצר</string>
     <string name="backup_failed">יצירת הגיבוי נכשלה. אנא נסה שוב.</string>
