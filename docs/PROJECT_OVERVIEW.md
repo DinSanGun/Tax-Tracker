@@ -15,11 +15,9 @@ For the pre-release execution plan, see `docs/LAUNCH_PLAN.md`. For architecture 
 
 1. **Category management**
    - Category list → add / edit / delete category
-   - Manual reorder mode (persisted `orderIndex`)
-   - Language settings (Hebrew / English)
-   - **Export all data** → ZIP via Storage Access Framework (`categories.csv` + invoice CSVs per category with invoices) — human-readable, not for restore
-   - **Create backup** → ZIP via SAF containing `backup.json` — restore-ready app data
-   - **Restore from backup** → pick backup ZIP, validate, confirm, full replace of local data
+   - Manual reorder mode (persisted `orderIndex`) — Category list overflow → Order Categories
+   - **Export all data** → Category list overflow → Export — ZIP via Storage Access Framework (`categories.csv` + invoice CSVs per category with invoices) — human-readable, not for restore
+   - **Settings** (gear icon on Category list) → Language, Text size, Create backup, Restore from backup, Reset all data, About / Privacy Policy
 
 2. **Invoice management**
    - Select category → invoice list (search, filter, sort)
@@ -92,7 +90,7 @@ com.dinyairsadot.clearledger/
 ├── feature/
 │   ├── category/                # List, add, edit, reorder, CategoryForm
 │   ├── invoice/                 # List, add, edit, details, search/filter/sort
-│   └── settings/                # LanguageSettingsScreen
+│   └── settings/                # SettingsScreen (hub), LanguageSettingsScreen, AboutScreen
 ├── ui/theme/                    # Material 3 theme
 └── archive/                     # Unused in-memory repos (reference only)
 ```
@@ -114,6 +112,7 @@ com.dinyairsadot.clearledger/
 | `add_invoice/{categoryId}` | Add invoice |
 | `invoice_details/{invoiceId}` | Read-only details |
 | `edit_invoice/{invoiceId}` | Edit invoice |
+| `settings` | Settings hub — Language, Text size, Backup/Restore, Reset, About |
 | `language_settings` | Manual language switch |
 | `about` | App info and privacy policy link |
 
@@ -203,7 +202,7 @@ ViewModels expose immutable `UiState` data classes via `StateFlow`.
 ## H. UI Conventions
 
 ### Top app bars
-- Category list: default theme, title “Bills & Taxes”, overflow menu (reorder, language, about, export all data, create backup, restore backup)
+- Category list: default theme, title “Bills & Taxes”, Settings gear icon (→ Settings hub) + a small overflow menu with only Export all data and Order categories
 - Invoice flows: category-colored bar via `categoryTopAppBarColors()` with contrast-aware text/icons
 - Edit Category: top-bar Save action; discard warning for unsaved changes
 - Invoice list: overflow Export; active filter indication and clear-filters action
@@ -282,8 +281,8 @@ ViewModels expose immutable `UiState` data classes via `StateFlow`.
 
 | Entry point | Output / input | Behavior |
 |-------------|----------------|----------|
-| Category list overflow → Create backup | `.zip` via SAF containing `backup.json` | Exports all categories and invoices with IDs, order, colors, custom fields, service period modes, currencies, raw enums, ISO dates, metadata |
-| Category list overflow → Restore backup | User picks backup `.zip` via SAF | Validates `backup.json` → destructive confirmation → transactional full replace |
+| Settings → Create backup | `.zip` via SAF containing `backup.json` | Exports all categories and invoices with IDs, order, colors, custom fields, service period modes, currencies, raw enums, ISO dates, metadata |
+| Settings → Restore from backup | User picks backup `.zip` via SAF | Validates `backup.json` → destructive confirmation → transactional full replace |
 
 **Implementation notes:**
 - Pure Kotlin: `BackupZipExporter`, `BackupZipImporter`, `BackupValidator`, `BackupMapper` in `core/util/backup/`

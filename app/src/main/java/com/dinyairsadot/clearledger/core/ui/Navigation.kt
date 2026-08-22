@@ -63,6 +63,7 @@ import com.dinyairsadot.clearledger.feature.category.CategoryListViewModelFactor
 import com.dinyairsadot.clearledger.feature.invoice.InvoiceListViewModelFactory
 import com.dinyairsadot.clearledger.feature.settings.AboutScreen
 import com.dinyairsadot.clearledger.feature.settings.LanguageSettingsScreen
+import com.dinyairsadot.clearledger.feature.settings.SettingsScreen
 import androidx.activity.ComponentActivity
 
 
@@ -94,6 +95,7 @@ sealed class Screen(val route: String) {
 
     object LanguageSettings : Screen("language_settings")
     object About : Screen("about")
+    object Settings : Screen("settings")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -142,14 +144,9 @@ fun ClearLedgerNavHost(
                 onEditCategoryClick = { id ->
                     navController.navigate(Screen.EditCategory.routeWithId(id))
                 },
-                onLanguageSettingsClick = {
-                    navController.navigate(Screen.LanguageSettings.route)
+                onSettingsClick = {
+                    navController.navigate(Screen.Settings.route)
                 },
-                onAboutClick = {
-                    navController.navigate(Screen.About.route)
-                },
-                currentTextSize = currentTextSize,
-                onTextSizeSelected = onTextSizeSelected,
                 viewModel = viewModel,
                 showCategoryAddedMessage = categoryAdded,
                 onCategoryAddedMessageShown = {
@@ -584,6 +581,34 @@ fun ClearLedgerNavHost(
         composable(Screen.About.route) {
             AboutScreen(
                 onNavigateBack = { navController.popIfSafe() }
+            )
+        }
+        // -------------------------
+        // Settings screen
+        // -------------------------
+        composable(Screen.Settings.route) { backStackEntry ->
+            // Share the same ViewModel instance as CategoryList so backup/restore/reset
+            // reuse the exact same repository calls (no duplicated business logic).
+            val context = LocalContext.current
+            val parentEntry = remember(backStackEntry) {
+                navController.getBackStackEntry(Screen.CategoryList.route)
+            }
+            val viewModel: CategoryListViewModel = viewModel(
+                parentEntry,
+                factory = CategoryListViewModelFactory(categoryRepository, invoiceRepository, context)
+            )
+
+            SettingsScreen(
+                onNavigateBack = { navController.popIfSafe() },
+                onLanguageSettingsClick = {
+                    navController.navigate(Screen.LanguageSettings.route)
+                },
+                onAboutClick = {
+                    navController.navigate(Screen.About.route)
+                },
+                currentTextSize = currentTextSize,
+                onTextSizeSelected = onTextSizeSelected,
+                viewModel = viewModel
             )
         }
     }

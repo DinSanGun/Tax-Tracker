@@ -35,7 +35,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -69,10 +68,6 @@ import com.dinyairsadot.clearledger.core.ui.AnimatedDropdownMenu
 import com.dinyairsadot.clearledger.core.ui.AppSnackbar
 import com.dinyairsadot.clearledger.core.ui.rememberAnimatedDropdownMenuState
 import com.dinyairsadot.clearledger.core.util.AllDataZipExporter
-import com.dinyairsadot.clearledger.core.util.backup.BackupPayload
-import com.dinyairsadot.clearledger.core.util.backup.BackupValidationResult
-import com.dinyairsadot.clearledger.core.util.backup.BackupZipExporter
-import com.dinyairsadot.clearledger.core.domain.AppTextSize
 import com.dinyairsadot.clearledger.core.util.CategoriesCsvLabels
 import com.dinyairsadot.clearledger.feature.invoice.rememberInvoiceCsvExportLabels
 import java.io.IOException
@@ -101,10 +96,7 @@ fun CategoryListScreen(
     onCategoryClick: (Long) -> Unit,
     onEditCategoryClick: (Long) -> Unit,
     onDeleteCategory: (Long) -> Unit,
-    onLanguageSettingsClick: () -> Unit,
-    onAboutClick: () -> Unit,
-    currentTextSize: AppTextSize,
-    onTextSizeSelected: (AppTextSize) -> Unit,
+    onSettingsClick: () -> Unit,
     isReorderMode: Boolean,
     onEnterReorderMode: () -> Unit,
     onExitReorderMode: () -> Unit,
@@ -115,9 +107,6 @@ fun CategoryListScreen(
     viewModel: CategoryListViewModel
 ) {
     var pendingDeleteId by remember { mutableStateOf<Long?>(null) }
-    var pendingRestorePayload by remember { mutableStateOf<BackupPayload?>(null) }
-    var showResetConfirmDialog by remember { mutableStateOf(false) }
-    var showTextSizeDialog by remember { mutableStateOf(false) }
     var isFileOperationInProgress by remember { mutableStateOf(false) }
     val overflowMenuState = rememberAnimatedDropdownMenuState()
     val context = LocalContext.current
@@ -141,23 +130,6 @@ fun CategoryListScreen(
     val noDataToExportMessage = stringResource(R.string.no_data_to_export)
     val exportCompletedMessage = stringResource(R.string.export_completed)
     val exportFailedMessage = stringResource(R.string.export_failed)
-    val createBackupMessage = stringResource(R.string.create_backup)
-    val backupCreatedMessage = stringResource(R.string.backup_created)
-    val backupFailedMessage = stringResource(R.string.backup_failed)
-    val restoreBackupMessage = stringResource(R.string.restore_backup)
-    val restoreBackupDialogTitle = stringResource(R.string.restore_backup_dialog_title)
-    val restoreBackupDialogMessage = stringResource(R.string.restore_backup_dialog_message)
-    val restoreButtonLabel = stringResource(R.string.restore)
-    val restoreCompletedMessage = stringResource(R.string.restore_completed)
-    val restoreFailedMessage = stringResource(R.string.restore_failed)
-    val restoreInvalidBackupMessage = stringResource(R.string.restore_invalid_backup)
-    val restoreUnsupportedVersionMessage = stringResource(R.string.restore_unsupported_version)
-    val resetAllDataMessage = stringResource(R.string.reset_all_data)
-    val resetAllDataDialogTitle = stringResource(R.string.reset_all_data_dialog_title)
-    val resetAllDataDialogMessage = stringResource(R.string.reset_all_data_dialog_message)
-    val resetButtonLabel = stringResource(R.string.reset)
-    val dataResetCompleteMessage = stringResource(R.string.data_reset_complete)
-    val resetFailedMessage = stringResource(R.string.reset_failed)
 
     LaunchedEffect(showCategoryAddedMessage) {
         if (showCategoryAddedMessage) {
@@ -213,53 +185,6 @@ fun CategoryListScreen(
         }
     }
 
-    val backupLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/zip")
-    ) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        coroutineScope.launch {
-            isFileOperationInProgress = true
-            try {
-                val backupData = viewModel.loadAllDataForBackup()
-                withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                        BackupZipExporter.writeZip(outputStream, backupData)
-                    } ?: throw IOException("Failed to open output stream")
-                }
-                snackbarHostState.showSnackbar(backupCreatedMessage)
-            } catch (_: Exception) {
-                snackbarHostState.showSnackbar(backupFailedMessage)
-            } finally {
-                isFileOperationInProgress = false
-            }
-        }
-    }
-
-    val restoreLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
-        uri ?: return@rememberLauncherForActivityResult
-        coroutineScope.launch {
-            isFileOperationInProgress = true
-            try {
-                val result = withContext(Dispatchers.IO) {
-                    viewModel.validateAndParseBackup(uri)
-                }
-                when (result) {
-                    is BackupValidationResult.Valid -> pendingRestorePayload = result.payload
-                    is BackupValidationResult.UnsupportedVersion -> {
-                        snackbarHostState.showSnackbar(restoreUnsupportedVersionMessage)
-                    }
-                    is BackupValidationResult.Invalid -> {
-                        snackbarHostState.showSnackbar(restoreInvalidBackupMessage)
-                    }
-                }
-            } finally {
-                isFileOperationInProgress = false
-            }
-        }
-    }
-
     // Refresh invoice counts when screen resumes
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -289,6 +214,12 @@ fun CategoryListScreen(
                             Text(text = stringResource(R.string.done))
                         }
                     } else {
+                        IconButton(onClick = onSettingsClick) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.settings)
+                            )
+                        }
                         IconButton(onClick = { overflowMenuState.open() }) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
@@ -299,34 +230,6 @@ fun CategoryListScreen(
                             state = overflowMenuState,
                             onDismissRequest = {}
                         ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.reorder_categories)) },
-                                onClick = {
-                                    overflowMenuState.dismiss()
-                                    onEnterReorderMode()
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.language_settings)) },
-                                onClick = {
-                                    overflowMenuState.dismiss()
-                                    onLanguageSettingsClick()
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.text_size_label)) },
-                                onClick = {
-                                    overflowMenuState.dismiss()
-                                    showTextSizeDialog = true
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.about)) },
-                                onClick = {
-                                    overflowMenuState.dismiss()
-                                    onAboutClick()
-                                }
-                            )
                             DropdownMenuItem(
                                 text = { Text(exportAllDataMessage) },
                                 enabled = !isFileOperationInProgress,
@@ -344,33 +247,10 @@ fun CategoryListScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text(createBackupMessage) },
-                                enabled = !isFileOperationInProgress,
+                                text = { Text(stringResource(R.string.reorder_categories)) },
                                 onClick = {
                                     overflowMenuState.dismiss()
-                                    val filename = "clear_ledger_backup_${LocalDate.now()}.zip"
-                                    backupLauncher.launch(filename)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(restoreBackupMessage) },
-                                enabled = !isFileOperationInProgress,
-                                onClick = {
-                                    overflowMenuState.dismiss()
-                                    restoreLauncher.launch(arrayOf("application/zip"))
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = resetAllDataMessage,
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                },
-                                enabled = !isFileOperationInProgress,
-                                onClick = {
-                                    overflowMenuState.dismiss()
-                                    showResetConfirmDialog = true
+                                    onEnterReorderMode()
                                 }
                             )
                         }
@@ -448,135 +328,6 @@ fun CategoryListScreen(
                     modifier = Modifier.padding(innerPadding)
                 )
             }
-        }
-
-        pendingRestorePayload?.let { payload ->
-            AlertDialog(
-                onDismissRequest = { pendingRestorePayload = null },
-                title = { Text(restoreBackupDialogTitle) },
-                text = { Text(restoreBackupDialogMessage) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            pendingRestorePayload = null
-                            coroutineScope.launch {
-                                isFileOperationInProgress = true
-                                try {
-                                    viewModel.performRestore(payload)
-                                    viewModel.refresh()
-                                    snackbarHostState.showSnackbar(restoreCompletedMessage)
-                                } catch (_: Exception) {
-                                    snackbarHostState.showSnackbar(restoreFailedMessage)
-                                } finally {
-                                    isFileOperationInProgress = false
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text(text = restoreButtonLabel)
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { pendingRestorePayload = null },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    ) {
-                        Text(stringResource(R.string.cancel))
-                    }
-                }
-            )
-        }
-
-        if (showResetConfirmDialog) {
-            AlertDialog(
-                onDismissRequest = { showResetConfirmDialog = false },
-                title = { Text(resetAllDataDialogTitle) },
-                text = { Text(resetAllDataDialogMessage) },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showResetConfirmDialog = false
-                            coroutineScope.launch {
-                                isFileOperationInProgress = true
-                                try {
-                                    viewModel.performReset()
-                                    viewModel.refresh()
-                                    snackbarHostState.showSnackbar(dataResetCompleteMessage)
-                                } catch (_: Exception) {
-                                    snackbarHostState.showSnackbar(resetFailedMessage)
-                                } finally {
-                                    isFileOperationInProgress = false
-                                }
-                            }
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
-                        )
-                    ) {
-                        Text(text = resetButtonLabel)
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = { showResetConfirmDialog = false },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    ) {
-                        Text(stringResource(R.string.cancel))
-                    }
-                }
-            )
-        }
-
-        if (showTextSizeDialog) {
-            AlertDialog(
-                onDismissRequest = { showTextSizeDialog = false },
-                title = { Text(stringResource(R.string.text_size_label)) },
-                text = {
-                    Column {
-                        TextSizeOptionRow(
-                            label = stringResource(R.string.text_size_normal),
-                            selected = currentTextSize == AppTextSize.NORMAL,
-                            onClick = {
-                                onTextSizeSelected(AppTextSize.NORMAL)
-                                showTextSizeDialog = false
-                            }
-                        )
-                        TextSizeOptionRow(
-                            label = stringResource(R.string.text_size_large),
-                            selected = currentTextSize == AppTextSize.LARGE,
-                            onClick = {
-                                onTextSizeSelected(AppTextSize.LARGE)
-                                showTextSizeDialog = false
-                            }
-                        )
-                        TextSizeOptionRow(
-                            label = stringResource(R.string.text_size_extra_large),
-                            selected = currentTextSize == AppTextSize.EXTRA_LARGE,
-                            onClick = {
-                                onTextSizeSelected(AppTextSize.EXTRA_LARGE)
-                                showTextSizeDialog = false
-                            }
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = { showTextSizeDialog = false },
-                        colors = ButtonDefaults.textButtonColors(
-                            contentColor = MaterialTheme.colorScheme.onSurface
-                        )
-                    ) {
-                        Text(stringResource(R.string.close))
-                    }
-                }
-            )
         }
 
         // Confirmation dialog
@@ -833,29 +584,6 @@ private fun CategoryItem(
                 }
             }
         }
-    }
-}
-
-/**
- * A single "Normal"/"Large" choice row in the text size dialog. Tapping the row
- * (label or radio button) immediately applies that choice via [onClick].
- */
-@Composable
-private fun TextSizeOptionRow(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(selected = selected, onClick = onClick)
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(text = label, style = MaterialTheme.typography.bodyLarge)
     }
 }
 

@@ -75,9 +75,9 @@ The app offers three distinct data portability features. **Do not confuse them:*
 | Feature | Menu location | Format | Purpose |
 |---------|---------------|--------|---------|
 | **Export** (invoice list) | Invoice overflow → Export | Localized CSV | Human-readable spreadsheet of currently visible invoices |
-| **Export all data** | Category overflow → Export all data | ZIP with CSV files | Human-readable archive for review, accountants, or records |
-| **Backup** | Category overflow → Create backup | ZIP with `backup.json` | Restore-ready app data snapshot |
-| **Restore** | Category overflow → Restore from backup | Reads backup ZIP | Full replacement of local app data from a backup |
+| **Export all data** | Category list overflow → Export | ZIP with CSV files | Human-readable archive for review, accountants, or records |
+| **Backup** | Category list → Settings → Create backup | ZIP with `backup.json` | Restore-ready app data snapshot |
+| **Restore** | Category list → Settings → Restore from backup | Reads backup ZIP | Full replacement of local app data from a backup |
 
 #### Export (human-readable)
 - **Invoice list:** exports currently visible invoices (after search, filter, and sort) to localized CSV via Storage Access Framework (SAF)
@@ -142,7 +142,7 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for MVVM layers, validation s
 - `core/util/` — CSV/ZIP export and backup/restore utilities
 - `feature/category/` — category list, add/edit, reorder, export/backup/restore
 - `feature/invoice/` — invoice list, add/edit/details, search/filter/sort, CSV export
-- `feature/settings/` — language settings
+- `feature/settings/` — Settings hub, language settings, about
 
 ---
 

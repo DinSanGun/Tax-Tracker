@@ -68,9 +68,9 @@ Room database is currently **version 14** with incremental, non-destructive migr
 Routes are defined in `core/ui/Navigation.kt` (`Screen` sealed class). Category list is the start destination. Invoice screens require `categoryId`; edit/details require `invoiceId`.
 
 **Key feature modules:**
-- `feature/category/` — list, add/edit, reorder, export/backup/restore entry points
+- `feature/category/` — list, add/edit, reorder, export-all-data entry point (backup/restore/reset UI lives in `feature/settings/SettingsScreen`, sharing `CategoryListViewModel`)
 - `feature/invoice/` — list, add/edit/details, search/filter/sort, CSV export
-- `feature/settings/` — manual language switch
+- `feature/settings/` — Settings hub screen (Language, Text size, Backup/Restore, Reset, About entry points), manual language switch, About
 
 One-shot snackbar feedback uses `savedStateHandle` flags (e.g. after add/delete).
 

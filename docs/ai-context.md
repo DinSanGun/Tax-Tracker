@@ -41,7 +41,8 @@ Supports **Hebrew and English** with manual language switching and RTL/LTR layou
 | `feature/invoice/InvoiceListViewModel.kt` | Search/filter/sort pipeline; `buildCsvContent()` |
 | `feature/invoice/InvoiceListScreen.kt` | List UI, filter sheet, invoice CSV export SAF |
 | `feature/category/CategoryListViewModel.kt` | Category CRUD, reorder, export/backup/restore |
-| `feature/category/CategoryListScreen.kt` | Category list UI, export/backup/restore SAF |
+| `feature/category/CategoryListScreen.kt` | Category list UI; export-all-data SAF; overflow menu now only Export + Order categories |
+| `feature/settings/SettingsScreen.kt` | Settings hub (gear icon on Category list); backup/restore/reset SAF + dialogs; entry points to Language/Text size/About — shares `CategoryListViewModel` with Category list |
 | `core/util/InvoiceCsvExporter.kt` | Pure Kotlin invoice CSV generation |
 | `core/util/AllDataZipExporter.kt` | Pure Kotlin ZIP (categories.csv + invoice CSVs) |
 | `core/util/backup/BackupZipExporter.kt` | Pure Kotlin backup ZIP writer |
@@ -140,14 +141,16 @@ Invoice CSV export uses **`visibleInvoices`** (and category name/titles from UiS
 
 ## 8) Backup and restore behavior (do not regress)
 
-### Create backup (`CategoryListScreen`)
-- Overflow → Create backup; SAF `application/zip`
+**UI entry point (Aug 2026):** Create backup, Restore from backup, and Reset all data moved from the Category list overflow menu into the new **Settings** screen (`feature/settings/SettingsScreen.kt`, gear icon on Category list). `SettingsScreen` shares the same `CategoryListViewModel` instance as `CategoryList` (via `getBackStackEntry(Screen.CategoryList.route)`) — the calls below are unchanged, only the screen that invokes them moved.
+
+### Create backup (`SettingsScreen`)
+- Settings → Create backup; SAF `application/zip`
 - `CategoryListViewModel.loadAllDataForBackup()` → `BackupZipExporter.writeZip()`
 - ZIP contains single `backup.json` with `formatVersion`, metadata, categories, invoices
 - Stores raw enum names, ISO dates, explicit nulls, IDs, order, custom fields — **not** localized display strings
 
-### Restore backup (`CategoryListScreen`)
-- Overflow → Restore from backup; SAF `OpenDocument` for `application/zip`
+### Restore backup (`SettingsScreen`)
+- Settings → Restore from backup; SAF `OpenDocument` for `application/zip`
 - `CategoryListViewModel.validateAndParseBackup(uri)` → `BackupZipImporter` + `BackupValidator`
 - If valid: show destructive confirmation dialog; on confirm → `performRestore()` → `RoomBackupRestoreRepository.restoreFromBackup()`
 - **Full replace only** — not merge; validation before delete; transaction rolls back on failure
@@ -188,6 +191,8 @@ Ask before: DB migrations, conflating export with backup, allowing CSV restore, 
 **Restore** (`73b7bd6`): full-replace restore with validation, transaction, ID preservation, seeding flag handling.
 
 **Pre-release polish (Jun 2026):** dialog action color semantics (error/onSurface/primary per button role across all 7 dialogs); rapid-back blank-screen fix (`popIfSafe()` in Navigation.kt + `BackHandler(enabled = true)` at CategoryList root, public APIs only, lint passes); custom field UI clarity (OutlinedButton + icon in category form; invoice custom fields use standard floating label consistent with other fields); locale/seeding fix (reset uses `buildSavedLocaleContext()`; restore sets `last_applied_language` to block re-localization of backup names). 7 Play Store screenshots captured.
+
+**Settings screen / navigation cleanup (Aug 2026):** Category list overflow menu reduced to Export + Order categories only; added Settings gear icon → new `SettingsScreen` (`feature/settings/`) grouping Language, Text size, Create backup, Restore from backup, Reset all data, About. Pure navigation/UI reorganization — backup/restore/reset reuse the same `CategoryListViewModel` calls via shared back-stack entry; language implementation itself unchanged.
 
 ---
 

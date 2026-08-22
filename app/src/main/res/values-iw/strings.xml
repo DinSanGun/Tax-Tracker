@@ -318,6 +318,7 @@
     <!-- Language Settings -->
     <string name="language_settings">הגדרות שפה</string>
     <string name="select_language">בחר שפה</string>
+    <string name="applying_language">מעדכן שפה…</string>
 
     <!-- Text Size -->
     <string name="text_size_label">גודל טקסט</string>
@@ -340,4 +341,10 @@
     <string name="reset_all_data_dialog_message">פעולה זו תמחק לצמיתות את כל הקטגוריות והחשבוניות, ותשחזר את קטגוריות ברירת המחדל. לא ניתן לבטל פעולה זו.</string>
     <string name="data_reset_complete">כל הנתונים אופסו</string>
     <string name="reset_failed">האיפוס נכשל. אנא נסה שנית.</string>
+
+    <!-- Settings Screen -->
+    <string name="settings">הגדרות</string>
+    <string name="settings_section_general">כללי</string>
+    <string name="settings_section_data">נתונים</string>
+    <string name="settings_section_about">אודות</string>
 </resources>
