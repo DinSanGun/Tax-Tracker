@@ -39,4 +39,8 @@ class RoomInvoiceRepository(
     override suspend fun countInvoicesWithAttachmentUri(attachmentUri: String): Int {
         return invoiceDao.countByAttachmentUri(attachmentUri)
     }
+
+    override suspend fun countInvoicesWithAttachmentFileName(attachmentFileName: String): Int {
+        return invoiceDao.countByAttachmentFileName(attachmentFileName)
+    }
 }

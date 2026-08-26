@@ -9,29 +9,26 @@ import android.provider.OpenableColumns
 /**
  * Helpers for the single local image/PDF invoice attachment feature.
  *
- * The attachment is never copied into app storage: [Context.getContentResolver] keeps a
- * persisted read-permission grant on the picker-provided `content://` Uri (obtained via
- * `ActivityResultContracts.OpenDocument`), so the document remains accessible across app
- * restarts as long as the underlying document itself is not deleted or moved by the user.
+ * Newly picked attachments are copied once into an app-private managed file (see
+ * [AttachmentStorage]) so the invoice no longer depends on the original external `content://`
+ * Uri: the source document can be deleted or moved afterwards without breaking the attachment.
  *
- * Attachment files are not yet included in backup/restore; only the Uri reference is stored
- * on the invoice (see `core/util/backup/BackupMapper.kt`).
+ * Invoices created before this change stored only a persisted external `content://` Uri
+ * (obtained via `ActivityResultContracts.OpenDocument`, kept alive across restarts through
+ * [Context.getContentResolver]'s persisted read-permission grant). Those legacy references are
+ * migrated lazily to a managed copy the next time the invoice list containing them is loaded
+ * (see `InvoiceListViewModel.migrateLegacyAttachmentIfNeeded`); until migrated (or if the
+ * original document is no longer accessible), this legacy Uri is still opened directly.
  *
- * Two different invoices can legitimately reference the exact same Uri (the user picked the
- * same file twice). Permission release call sites must therefore confirm no other *persisted*
- * invoice still needs a Uri before releasing it — see [releaseIfUnreferenced].
+ * Attachment files are not yet included in backup/restore; only the reference is stored on the
+ * invoice (see `core/util/backup/BackupMapper.kt`).
+ *
+ * Two different invoices can legitimately reference the exact same legacy Uri (the user picked
+ * the same file twice, before this change). Permission release call sites must therefore
+ * confirm no other *persisted* invoice still needs a Uri before releasing it — see
+ * [releaseIfUnreferenced].
  */
 object AttachmentUtil {
-
-    /** Takes a persistable read permission grant so [uri] survives app/device restarts. */
-    fun takePersistableReadPermission(context: Context, uri: Uri) {
-        runCatching {
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-        }
-    }
 
     /**
      * Releases a previously taken persistable read permission for [uriString], if any.
@@ -49,14 +46,11 @@ object AttachmentUtil {
 
     /**
      * Releases the persistable permission on [candidateUri] unless [keepUri] matches it
-     * (e.g. the attachment currently saved on the invoice), or [isReferencedElsewhere] reports
+     * (e.g. the legacy Uri still saved on the invoice), or [isReferencedElsewhere] reports
      * that some other **persisted** invoice still references the exact same Uri (two invoices
-     * may legitimately point at the same attachment file). Used both:
-     * - when the user abandons a freshly-picked, unsaved attachment (replace, remove, or
-     *   discard) in the add/edit form, and
-     * - by [InvoiceListViewModel] after an update/delete that changes/removes a previously
-     *   *saved* attachment reference (with `keepUri = null`, since the old Uri is never the
-     *   value being kept in that case).
+     * may legitimately point at the same legacy attachment). Used by [InvoiceListViewModel]
+     * after an update/delete/migration that changes/removes a previously *saved* legacy
+     * attachment reference.
      *
      * [isReferencedElsewhere] should query persisted invoices only, after any DB write the
      * caller is performing has already completed, so the row being changed doesn't count
@@ -100,11 +94,48 @@ object AttachmentUtil {
     }
 
     /**
-     * Opens [uriString] via [Intent.ACTION_VIEW] using an appropriate external viewer,
-     * granting temporary read access. Never throws; failures are reported via [OpenResult]
-     * so the caller can show an error message instead of crashing.
+     * Opens an invoice's attachment via [Intent.ACTION_VIEW], granting temporary read access.
+     * Prefers the managed internal copy ([managedFileName]), opened through [AttachmentStorage]
+     * and the app's `FileProvider` (always `content://`, never `file://`); falls back to the
+     * legacy external [legacyUriString] for invoices not yet migrated. Never throws; failures
+     * are reported via [OpenResult] so the caller can show an error message instead of crashing.
      */
-    fun openAttachment(context: Context, uriString: String?): OpenResult {
+    fun openAttachment(
+        context: Context,
+        managedFileName: String?,
+        managedMimeType: String?,
+        legacyUriString: String?
+    ): OpenResult {
+        return if (!managedFileName.isNullOrBlank()) {
+            openManagedFile(context, managedFileName, managedMimeType)
+        } else {
+            openLegacyExternalUri(context, legacyUriString)
+        }
+    }
+
+    private fun openManagedFile(context: Context, fileName: String, mimeType: String?): OpenResult {
+        val file = AttachmentStorage.fileFor(context, fileName)
+        if (file == null || !file.exists() || !file.canRead()) return OpenResult.NotAccessible
+
+        val uri = runCatching { AttachmentStorage.contentUriFor(context, file) }.getOrNull()
+            ?: return OpenResult.NotAccessible
+        val resolvedMimeType = mimeType ?: "*/*"
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, resolvedMimeType)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        return try {
+            context.startActivity(intent)
+            OpenResult.Opened
+        } catch (_: ActivityNotFoundException) {
+            OpenResult.NoViewerApp
+        } catch (_: SecurityException) {
+            OpenResult.NotAccessible
+        }
+    }
+
+    private fun openLegacyExternalUri(context: Context, uriString: String?): OpenResult {
         if (uriString.isNullOrBlank()) return OpenResult.NotAccessible
         val uri = runCatching { Uri.parse(uriString) }.getOrNull()
             ?: return OpenResult.NotAccessible

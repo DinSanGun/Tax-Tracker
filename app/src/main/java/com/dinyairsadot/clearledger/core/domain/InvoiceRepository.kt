@@ -38,8 +38,14 @@ interface InvoiceRepository {
 
     /**
      * Returns how many persisted invoices currently reference [attachmentUri]. Used to decide
-     * whether a persisted SAF read permission for that Uri is safe to release, since multiple
-     * invoices may point at the same attachment.
+     * whether a persisted SAF read permission for that legacy Uri is safe to release, since
+     * multiple invoices may point at the same attachment.
      */
     suspend fun countInvoicesWithAttachmentUri(attachmentUri: String): Int
+
+    /**
+     * Returns how many persisted invoices currently reference the managed attachment file
+     * [attachmentFileName]. Used to decide whether that file is safe to delete.
+     */
+    suspend fun countInvoicesWithAttachmentFileName(attachmentFileName: String): Int
 }

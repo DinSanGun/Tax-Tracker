@@ -56,16 +56,21 @@ fun rememberAttachmentDisplayName(attachmentUri: String?): String? {
 /**
  * Attach/replace/remove control for the Add/Edit invoice forms. Only picks the file and
  * reports the resulting Uri or removal to the caller — the caller owns the actual form state
- * so it can fold attachment changes into its existing unsaved-changes snapshot.
+ * (copying the picked document into app-private storage, and folding the result into its
+ * existing unsaved-changes snapshot).
+ *
+ * [displayName] is caller-resolved so this composable doesn't need to know whether the current
+ * attachment is a managed copy (display name already known, no lookup needed) or a legacy,
+ * not-yet-migrated external Uri (looked up on demand via [rememberAttachmentDisplayName]).
  */
 @Composable
 fun InvoiceAttachmentField(
-    attachmentUri: String?,
+    hasAttachment: Boolean,
+    displayName: String?,
     onAttach: (Uri) -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val displayName = rememberAttachmentDisplayName(attachmentUri)
     val pickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -73,7 +78,7 @@ fun InvoiceAttachmentField(
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
-        if (attachmentUri.isNullOrBlank()) {
+        if (!hasAttachment) {
             Text(
                 text = stringResource(R.string.attachment_none),
                 style = MaterialTheme.typography.bodyMedium,

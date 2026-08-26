@@ -131,15 +131,34 @@ data class Invoice(
     /** Stored display currency; existing DB rows default to ILS via migration. */
     val amountCurrency: InvoiceCurrency = InvoiceCurrency.ILS,
     /**
-     * Persisted `content://` Uri string of the single local image/PDF attachment for this
-     * invoice, or null if none. The underlying document is never copied into app storage;
-     * access relies on a persisted SAF read permission grant (see `AttachmentUtil`).
-     *
-     * Local-only for now: attachment references are not yet included in backup/restore
-     * (see `core/util/backup/BackupMapper.kt`).
+     * Legacy persisted `content://` Uri string of the single local image/PDF attachment for
+     * this invoice, or null. Only ever set for invoices created before the app-private
+     * attachment storage refactor; new attachments never populate this field. Lazily migrated
+     * to [attachmentFileName] the next time this invoice's list is loaded, if the source
+     * document is still accessible (see `InvoiceListViewModel.migrateLegacyAttachmentIfNeeded`).
+     * If migration isn't possible (source deleted/moved), this is left as-is so the invoice
+     * itself is never lost.
      */
-    val attachmentUri: String? = null
+    val attachmentUri: String? = null,
+    /**
+     * Filename of the managed, app-private copy of this invoice's attachment under
+     * `filesDir/invoice_attachments/` (see `AttachmentStorage`), or null if none. Once set,
+     * the invoice no longer depends on the original external document: it can be deleted or
+     * moved by the user without breaking the attachment.
+     *
+     * Local-only for now: managed attachment files are not yet included in backup/restore
+     * (see `core/util/backup/BackupMapper.kt`); only these reference fields are persisted.
+     */
+    val attachmentFileName: String? = null,
+    /** Original display name of the attachment, kept for UI display since [attachmentFileName] is an internal identifier. */
+    val attachmentDisplayName: String? = null,
+    /** MIME type of the attachment, kept for opening it with the correct viewer. */
+    val attachmentMimeType: String? = null
 ) {
+    /** True if this invoice currently has an attachment, managed or not-yet-migrated legacy. */
+    val hasAttachment: Boolean
+        get() = !attachmentFileName.isNullOrBlank() || !attachmentUri.isNullOrBlank()
+
     // Backward compatibility: getters for old field names
     val customFieldValue1: String? get() = customFieldValues.getOrNull(0)
     val customFieldValue2: String? get() = customFieldValues.getOrNull(1)

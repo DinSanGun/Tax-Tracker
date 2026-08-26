@@ -292,8 +292,16 @@ fun InvoiceDetailsScreen(
                             )
                         }
 
-                        invoice.attachmentUri?.takeIf { it.isNotBlank() }?.let { attachmentUri ->
-                            val attachmentDisplayName = rememberAttachmentDisplayName(attachmentUri)
+                        if (invoice.hasAttachment) {
+                            // Legacy (not-yet-migrated) attachments have no stored display
+                            // name, so it's looked up on demand from the external Uri.
+                            val legacyAttachmentDisplayName =
+                                rememberAttachmentDisplayName(invoice.attachmentUri)
+                            val attachmentDisplayName = if (invoice.attachmentFileName != null) {
+                                invoice.attachmentDisplayName
+                            } else {
+                                legacyAttachmentDisplayName
+                            }
                             Spacer(modifier = Modifier.padding(top = 8.dp))
                             Text(
                                 text = stringResource(R.string.attachment_section_title),
@@ -312,7 +320,13 @@ fun InvoiceDetailsScreen(
                             TextButton(
                                 onClick = {
                                     coroutineScope.launch {
-                                        when (AttachmentUtil.openAttachment(context, attachmentUri)) {
+                                        val result = AttachmentUtil.openAttachment(
+                                            context = context,
+                                            managedFileName = invoice.attachmentFileName,
+                                            managedMimeType = invoice.attachmentMimeType,
+                                            legacyUriString = invoice.attachmentUri
+                                        )
+                                        when (result) {
                                             AttachmentUtil.OpenResult.Opened -> Unit
                                             AttachmentUtil.OpenResult.NotAccessible ->
                                                 snackbarHostState.showSnackbar(attachmentUnavailableMessage)

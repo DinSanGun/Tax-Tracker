@@ -20,7 +20,7 @@ import com.dinyairsadot.clearledger.core.data.entities.InvoiceEntity
 
 @Database(
     entities = [CategoryEntity::class, InvoiceEntity::class],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 @TypeConverters(
@@ -224,6 +224,19 @@ abstract class ClearLedgerDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Attachments are now copied into app-private storage (filesDir/invoice_attachments/)
+                // instead of only referencing an external SAF Uri. These three columns store the
+                // managed copy's reference; `attachmentUri` (added in 14->15) is kept as-is to hold
+                // any not-yet-migrated legacy attachment and is cleared once migration succeeds.
+                // Purely additive — no existing invoice data is touched or lost.
+                database.execSQL("ALTER TABLE invoices ADD COLUMN attachmentFileName TEXT")
+                database.execSQL("ALTER TABLE invoices ADD COLUMN attachmentDisplayName TEXT")
+                database.execSQL("ALTER TABLE invoices ADD COLUMN attachmentMimeType TEXT")
+            }
+        }
+
         fun getDatabase(context: Context): ClearLedgerDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -231,7 +244,7 @@ abstract class ClearLedgerDatabase : RoomDatabase() {
                     ClearLedgerDatabase::class.java,
                     "clear_ledger_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15, MIGRATION_15_16)
                     .build()
                 INSTANCE = instance
                 instance

@@ -1,6 +1,7 @@
 package com.dinyairsadot.clearledger.feature.invoice
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dinyairsadot.clearledger.R
@@ -11,6 +12,7 @@ import com.dinyairsadot.clearledger.core.domain.InvoiceCurrency
 import com.dinyairsadot.clearledger.core.domain.InvoiceRepository
 import com.dinyairsadot.clearledger.core.domain.PaymentStatus
 import com.dinyairsadot.clearledger.core.domain.ServicePeriodMode
+import com.dinyairsadot.clearledger.core.util.AttachmentStorage
 import com.dinyairsadot.clearledger.core.util.AttachmentUtil
 import com.dinyairsadot.clearledger.core.util.InvoiceCsvExportLabels
 import com.dinyairsadot.clearledger.core.util.InvoiceCsvExporter
@@ -69,9 +71,19 @@ data class InvoiceUi(
     // Explicit mode; never infer this from dates.
     val servicePeriodMode: ServicePeriodMode = ServicePeriodMode.MONTH,
     val amountCurrency: InvoiceCurrency = InvoiceCurrency.ILS,
-    /** Persisted `content://` Uri string of the single local attachment; null if none. */
-    val attachmentUri: String? = null
-)
+    /** Legacy persisted `content://` Uri string of a not-yet-migrated attachment; null once migrated. */
+    val attachmentUri: String? = null,
+    /** Filename of the managed, app-private attachment copy; null if none. */
+    val attachmentFileName: String? = null,
+    /** Original display name of the attachment, for UI. */
+    val attachmentDisplayName: String? = null,
+    /** MIME type of the attachment, for opening it. */
+    val attachmentMimeType: String? = null
+) {
+    /** True if this invoice currently has an attachment, managed or not-yet-migrated legacy. */
+    val hasAttachment: Boolean
+        get() = !attachmentFileName.isNullOrBlank() || !attachmentUri.isNullOrBlank()
+}
 
 data class InvoiceListUiState(
     val isLoading: Boolean = false,
@@ -144,8 +156,9 @@ class InvoiceListViewModel(
                 is InvoiceListScope.AllInvoices -> invoiceRepository.getAllInvoices()
                 is InvoiceListScope.CategoryInvoices -> invoiceRepository.getInvoicesForCategory(scope.categoryId)
             }
-            sourceDomainInvoices = invoices
-            val uiInvoices = invoices.map { it.toUi() }
+            val migratedInvoices = invoices.map { migrateLegacyAttachmentIfNeeded(it) }
+            sourceDomainInvoices = migratedInvoices
+            val uiInvoices = migratedInvoices.map { it.toUi() }
             updateStateAndRecompute { state ->
                 state.copy(
                     isLoading = false,
@@ -162,6 +175,44 @@ class InvoiceListViewModel(
                 visibleInvoiceDomains = emptyList(),
                 errorMessage = context.getString(R.string.failed_to_load_invoices)
             )
+        }
+    }
+
+    /**
+     * Lazily migrates a not-yet-migrated legacy `content://` attachment to a managed,
+     * app-private copy, run every time the invoice list containing it is (re)loaded.
+     *
+     * If the legacy source is still readable, its bytes are copied into
+     * `filesDir/invoice_attachments/` (see [AttachmentStorage]), the invoice is updated to
+     * reference that managed copy instead, and the old persisted read permission is released
+     * once no other persisted invoice still needs it (two invoices may share the same legacy
+     * Uri). If the source is no longer accessible, or the copy/DB write fails, the invoice is
+     * returned unchanged — its legacy reference (and thus the invoice itself) is never lost;
+     * migration is simply retried the next time the list loads.
+     */
+    private suspend fun migrateLegacyAttachmentIfNeeded(invoice: Invoice): Invoice {
+        val legacyUri = invoice.attachmentUri
+        if (legacyUri.isNullOrBlank() || !invoice.attachmentFileName.isNullOrBlank()) return invoice
+
+        val sourceUri = runCatching { Uri.parse(legacyUri) }.getOrNull() ?: return invoice
+        val copied = AttachmentStorage.copyIntoManagedStorage(context, sourceUri) ?: return invoice
+
+        val migrated = invoice.copy(
+            attachmentUri = null,
+            attachmentFileName = copied.fileName,
+            attachmentDisplayName = copied.displayName,
+            attachmentMimeType = copied.mimeType
+        )
+        return try {
+            invoiceRepository.updateInvoice(migrated)
+            AttachmentUtil.releaseIfUnreferenced(context, legacyUri) { uri ->
+                invoiceRepository.countInvoicesWithAttachmentUri(uri) > 0
+            }
+            migrated
+        } catch (_: Exception) {
+            // DB write failed; drop the orphaned copy we just made and keep the invoice as-is.
+            AttachmentStorage.deleteManagedFile(context, copied.fileName)
+            invoice
         }
     }
 
@@ -347,7 +398,9 @@ class InvoiceListViewModel(
         notes: String,
         customFieldValues: List<String> = emptyList(),
         amountCurrency: InvoiceCurrency = InvoiceCurrency.ILS,
-        attachmentUri: String? = null
+        attachmentFileName: String? = null,
+        attachmentDisplayName: String? = null,
+        attachmentMimeType: String? = null
     ) {
         viewModelScope.launch {
             try {
@@ -394,7 +447,11 @@ class InvoiceListViewModel(
                     pinnedSnapshot = pinnedSnapshot,
                     servicePeriodMode = servicePeriodMode,
                     amountCurrency = amountCurrency,
-                    attachmentUri = attachmentUri
+                    // New invoices always go through the copy-on-pick flow, so they only ever
+                    // have a managed attachment reference — never a legacy attachmentUri.
+                    attachmentFileName = attachmentFileName,
+                    attachmentDisplayName = attachmentDisplayName,
+                    attachmentMimeType = attachmentMimeType
                 )
 
                 invoiceRepository.addInvoice(newInvoice)
@@ -409,15 +466,6 @@ class InvoiceListViewModel(
 
     suspend fun getInvoice(invoiceId: Long): Invoice? {
         return invoiceRepository.getInvoiceById(invoiceId)
-    }
-
-    /**
-     * True if any persisted invoice currently has [attachmentUri] as its `attachmentUri`.
-     * Used by the add/edit forms to avoid releasing a persisted SAF read permission for a
-     * freshly-picked-but-unsaved Uri that another saved invoice already depends on.
-     */
-    suspend fun isAttachmentUriReferenced(attachmentUri: String): Boolean {
-        return invoiceRepository.countInvoicesWithAttachmentUri(attachmentUri) > 0
     }
 
     fun updateInvoice(
@@ -437,6 +485,9 @@ class InvoiceListViewModel(
         notes: String,
         customFieldValues: List<String> = emptyList(),
         amountCurrency: InvoiceCurrency = InvoiceCurrency.ILS,
+        attachmentFileName: String? = null,
+        attachmentDisplayName: String? = null,
+        attachmentMimeType: String? = null,
         attachmentUri: String? = null
     ) {
         viewModelScope.launch {
@@ -473,15 +524,30 @@ class InvoiceListViewModel(
                     confirmationNumber = confirmationNumber,
                     servicePeriodMode = servicePeriodMode,
                     amountCurrency = amountCurrency,
+                    attachmentFileName = attachmentFileName,
+                    attachmentDisplayName = attachmentDisplayName,
+                    attachmentMimeType = attachmentMimeType,
                     attachmentUri = attachmentUri
                 )
 
                 invoiceRepository.updateInvoice(updated)
 
-                // The old attachment (if replaced or removed) may still be referenced by a
-                // *different* invoice that happens to point at the same Uri, so only release
+                // The old managed file (if replaced or removed) may still be referenced by a
+                // *different* invoice, so only delete it once no persisted invoice needs it
+                // anymore. The new managed file was already copied when the user picked it.
+                if (existing.attachmentFileName != attachmentFileName) {
+                    existing.attachmentFileName?.takeIf { it.isNotBlank() }?.let { oldFileName ->
+                        val stillReferenced = invoiceRepository
+                            .countInvoicesWithAttachmentFileName(oldFileName) > 0
+                        if (!stillReferenced) {
+                            AttachmentStorage.deleteManagedFile(context, oldFileName)
+                        }
+                    }
+                }
+
+                // The old legacy attachment (if replaced or removed) may still be referenced by
+                // a *different* invoice that happens to point at the same Uri, so only release
                 // its persisted SAF read permission once no persisted invoice needs it anymore.
-                // The new attachment's permission was already taken when the user picked it.
                 if (existing.attachmentUri != attachmentUri) {
                     AttachmentUtil.releaseIfUnreferenced(context, existing.attachmentUri) { uri ->
                         invoiceRepository.countInvoicesWithAttachmentUri(uri) > 0
@@ -506,8 +572,17 @@ class InvoiceListViewModel(
             try {
                 val existing = invoiceRepository.getInvoiceById(invoiceId)
                 invoiceRepository.deleteInvoice(invoiceId)
-                // Another invoice may still reference the same attachment Uri; only release
-                // the persisted permission once no persisted invoice needs it anymore.
+                // Another invoice may still reference the same managed file; only delete it
+                // once no persisted invoice needs it anymore.
+                existing?.attachmentFileName?.takeIf { it.isNotBlank() }?.let { fileName ->
+                    val stillReferenced = invoiceRepository
+                        .countInvoicesWithAttachmentFileName(fileName) > 0
+                    if (!stillReferenced) {
+                        AttachmentStorage.deleteManagedFile(context, fileName)
+                    }
+                }
+                // Another invoice may still reference the same legacy attachment Uri; only
+                // release the persisted permission once no persisted invoice needs it anymore.
                 existing?.attachmentUri?.let { uri ->
                     AttachmentUtil.releaseIfUnreferenced(context, uri) { candidateUri ->
                         invoiceRepository.countInvoicesWithAttachmentUri(candidateUri) > 0
@@ -553,6 +628,9 @@ private fun Invoice.toUi(): InvoiceUi {
         pinnedSnapshot = this.pinnedSnapshot,
         servicePeriodMode = this.servicePeriodMode,
         amountCurrency = this.amountCurrency,
-        attachmentUri = this.attachmentUri
+        attachmentUri = this.attachmentUri,
+        attachmentFileName = this.attachmentFileName,
+        attachmentDisplayName = this.attachmentDisplayName,
+        attachmentMimeType = this.attachmentMimeType
     )
 }

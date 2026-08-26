@@ -65,8 +65,14 @@ data class InvoiceEntity(
     val servicePeriodMode: ServicePeriodMode = ServicePeriodMode.MONTH,
     /** [InvoiceCurrency.name]; migration defaults existing rows to ILS. */
     val amountCurrencyCode: String = InvoiceCurrency.ILS.name,
-    /** Persisted `content://` Uri string of the single local attachment; null if none. */
-    val attachmentUri: String? = null
+    /** Legacy persisted `content://` Uri string of the single local attachment; null once migrated. */
+    val attachmentUri: String? = null,
+    /** Filename of the managed, app-private attachment copy under `invoice_attachments/`; null if none. */
+    val attachmentFileName: String? = null,
+    /** Original display name of the attachment, for UI. */
+    val attachmentDisplayName: String? = null,
+    /** MIME type of the attachment, for opening it. */
+    val attachmentMimeType: String? = null
 ) {
     fun toDomain(): Invoice {
         val issueDate = issueDateEpochDay?.let { 
@@ -128,7 +134,10 @@ data class InvoiceEntity(
             pinnedSnapshot = pinnedSnapshot,
             servicePeriodMode = servicePeriodMode,
             amountCurrency = amountCurrency,
-            attachmentUri = attachmentUri
+            attachmentUri = attachmentUri,
+            attachmentFileName = attachmentFileName,
+            attachmentDisplayName = attachmentDisplayName,
+            attachmentMimeType = attachmentMimeType
         )
     }
     
@@ -190,7 +199,10 @@ data class InvoiceEntity(
                 pinnedSnapshotJson = pinnedSnapshotJson,
                 servicePeriodMode = invoice.servicePeriodMode,
                 amountCurrencyCode = invoice.amountCurrency.name,
-                attachmentUri = invoice.attachmentUri
+                attachmentUri = invoice.attachmentUri,
+                attachmentFileName = invoice.attachmentFileName,
+                attachmentDisplayName = invoice.attachmentDisplayName,
+                attachmentMimeType = invoice.attachmentMimeType
             )
         }
     }

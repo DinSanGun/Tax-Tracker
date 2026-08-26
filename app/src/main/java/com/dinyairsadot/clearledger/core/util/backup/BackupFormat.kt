@@ -6,5 +6,5 @@ object BackupFormat {
     const val PRODUCER = "clear-ledger-android"
 
     // IMPORTANT: Update this constant whenever ClearLedgerDatabase @Database(version = ...) changes.
-    const val DB_SCHEMA_VERSION = 15
+    const val DB_SCHEMA_VERSION = 16
 }

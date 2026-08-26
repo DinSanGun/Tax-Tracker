@@ -21,6 +21,10 @@ interface InvoiceDao {
     /** Number of invoices currently persisting [attachmentUri] on their `attachmentUri` column. */
     @Query("SELECT COUNT(*) FROM invoices WHERE attachmentUri = :attachmentUri")
     suspend fun countByAttachmentUri(attachmentUri: String): Int
+
+    /** Number of invoices currently referencing the managed attachment file [attachmentFileName]. */
+    @Query("SELECT COUNT(*) FROM invoices WHERE attachmentFileName = :attachmentFileName")
+    suspend fun countByAttachmentFileName(attachmentFileName: String): Int
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(invoice: InvoiceEntity): Long

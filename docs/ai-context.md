@@ -1,6 +1,6 @@
 # Clear Ledger (Android) — AI Context (Cursor)
 
-_Last updated: 2026-08-24_
+_Last updated: 2026-08-26_
 
 Concise working context for AI-assisted development. For the full overview see `docs/PROJECT_OVERVIEW.md`; for architecture patterns see `docs/ARCHITECTURE.md`; for release planning see `docs/LAUNCH_PLAN.md` and `docs/RELEASE.md`.
 
@@ -17,7 +17,7 @@ Supports **Hebrew and English** with manual language switching and RTL/LTR layou
 - **Backup** — restore-ready ZIP with `backup.json`
 - **Restore** — full replace of local app data from a backup ZIP
 
-**Invoice attachments (implemented, local-only):** one optional image/PDF attachment per invoice via SAF `OpenDocument` + a persisted read Uri permission (no copy into app storage). **Not yet included in backup/restore** — that's the next launch-prep stage.
+**Invoice attachments (implemented, local-only):** one optional image/PDF attachment per invoice via SAF `OpenDocument`, immediately copied into app-private storage (`filesDir/invoice_attachments/`) so the original source file can be deleted/moved afterwards without breaking it. **Not yet included in backup/restore** — that's the next launch-prep stage.
 
 ---
 
@@ -25,11 +25,11 @@ Supports **Hebrew and English** with manual language switching and RTL/LTR layou
 
 - Kotlin, Jetpack Compose (Material 3), Navigation Compose
 - MVVM: ViewModels + `StateFlow`, lifecycle-aware collection
-- Room (SQLite) v15 — `RoomCategoryRepository`, `RoomInvoiceRepository`, `RoomBackupRestoreRepository`
+- Room (SQLite) v16 — `RoomCategoryRepository`, `RoomInvoiceRepository`, `RoomBackupRestoreRepository`
 - No DI framework; repos wired in `MainActivity` / ViewModel factories
 - Export/backup: pure Kotlin in `core/util/` and `core/util/backup/`; SAF + file I/O in Compose screens
 - Share Sheet: `androidx.core.content.FileProvider` (manifest + `res/xml/file_paths.xml`) + `core/util/ShareExportUtil.kt`; `Intent.ACTION_SEND` / `Intent.createChooser` in Compose screens
-- Invoice attachments: SAF `OpenDocument` + persisted read Uri permission, `core/util/AttachmentUtil.kt`; `Intent.ACTION_VIEW` to open via external viewer
+- Invoice attachments: SAF `OpenDocument` → copy into app-private storage, `core/util/AttachmentStorage.kt`; open via the same `FileProvider` + `core/util/AttachmentUtil.kt`; `Intent.ACTION_VIEW` to open via external viewer
 - Gradle KTS with version catalog (`libs.*`)
 
 ---
@@ -50,7 +50,8 @@ Supports **Hebrew and English** with manual language switching and RTL/LTR layou
 | `core/util/InvoiceCsvExporter.kt` | Pure Kotlin invoice CSV generation |
 | `core/util/AllDataZipExporter.kt` | Pure Kotlin ZIP (categories.csv + invoice CSVs) |
 | `core/util/ShareExportUtil.kt` | Stages export bytes in cache, mints `FileProvider` Uri, opens Share Sheet |
-| `core/util/AttachmentUtil.kt` | Invoice attachment: persisted SAF read permission take/release, display name lookup, `ACTION_VIEW` open |
+| `core/util/AttachmentStorage.kt` | Copies picked attachments into `filesDir/invoice_attachments/` (collision-safe names), mints managed-file `FileProvider` Uris, deletes managed files |
+| `core/util/AttachmentUtil.kt` | Invoice attachment: legacy SAF read permission release, display name lookup, `ACTION_VIEW` open (managed file or legacy Uri) |
 | `feature/invoice/InvoiceAttachmentField.kt` | Shared attach/replace/remove control used by Add/Edit invoice forms |
 | `core/util/backup/BackupZipExporter.kt` | Pure Kotlin backup ZIP writer |
 | `core/util/backup/BackupZipImporter.kt` | Pure Kotlin backup ZIP reader |
@@ -172,12 +173,14 @@ Invoice CSV export uses **`visibleInvoices`** (and category name/titles from UiS
 - Sets seeding flags after success; sets `last_applied_language` to current locale to prevent re-localization of backup category names on next launch; does not touch language preference
 - **CSV/ZIP exports are rejected** — only backup ZIPs with `backup.json`
 
-### Invoice attachments (Aug 2026, do not regress)
-- **Local-only for now:** `Invoice.attachmentUri` is intentionally excluded from `BackupInvoiceDto`/`BackupMapper`. Do not add it there without explicitly implementing attachment-aware backup/restore as its own stage (decide file embedding vs. documented limitation first).
-- **No copy into app storage:** the attachment stays wherever the user picked it from; the app only stores the `content://` Uri string and a persisted read permission grant (`AttachmentUtil.takePersistableReadPermission`). Do not add file-copying logic without a clear reason.
-- **Permission release timing matters:** never release the persisted permission for the invoice's currently-*saved* `attachmentUri` until a save actually replaces/removes it (see `AttachmentUtil.releaseIfUnreferenced` and the release call in `InvoiceListViewModel.updateInvoice`/`deleteInvoice`). Releasing too early breaks "attach → save → close app → reopen → still opens."
-- **Shared Uris across invoices are protected (Aug 2026 fix):** two invoices may legitimately reference the exact same `attachmentUri`. Before releasing any Uri's persisted permission — on update, delete, or an abandoned unsaved pick — callers must confirm via `InvoiceRepository.countInvoicesWithAttachmentUri` / `InvoiceListViewModel.isAttachmentUriReferenced` that no other **persisted** invoice still needs it. Never reintroduce an unconditional release.
-- **Unsaved-changes:** attachment changes are part of `EditableInvoiceSnapshot`; canceling the SAF picker must not itself count as a change.
+### Invoice attachments (Aug 2026, app-private storage — do not regress)
+- **Local-only for now:** none of `Invoice`'s attachment fields (`attachmentFileName`, `attachmentDisplayName`, `attachmentMimeType`, `attachmentUri`) are included in `BackupInvoiceDto`/`BackupMapper`. Do not add them without explicitly implementing attachment-aware backup/restore as its own stage (decide file embedding vs. documented limitation first).
+- **Copied into app-private storage:** a picked document's bytes are copied into `filesDir/invoice_attachments/` under a random, collision-safe filename (`AttachmentStorage.copyIntoManagedStorage`), and the invoice stores that managed filename plus the captured display name/MIME type. The original source file is **not** needed afterwards and can be deleted/moved. Do not revert to storing only an external Uri reference.
+- **No broad storage permission, `MediaStore`, or cloud storage** — only a plain `filesDir` subdirectory exposed through the existing `FileProvider` (`res/xml/file_paths.xml`, `invoice_attachments/` path entry).
+- **Managed-file cleanup timing matters:** a pending, never-saved copy (replaced again, removed, or the form discarded) is always safe to delete directly — it's a brand-new file nothing could reference yet. The invoice's actual *saved* managed file must only be deleted after a real save/delete succeeds, and only if no other persisted invoice still references it (`InvoiceRepository.countInvoicesWithAttachmentFileName`, mirroring the legacy Uri check below). See `InvoiceListViewModel.updateInvoice`/`deleteInvoice` and the Add/Edit screens' `onAttach`/`onRemove`/discard handlers.
+- **Legacy invoices migrate lazily:** invoices created before this storage strategy have only a legacy `attachmentUri`. `InvoiceListViewModel.migrateLegacyAttachmentIfNeeded` (called from `loadInvoicesForScope`, i.e. every list load) tries to copy the legacy source in; on success it clears `attachmentUri` and releases the old permission once unreferenced (see the shared-Uri check below). If the source is inaccessible, the invoice and its legacy reference are left completely untouched — **never delete invoice data because an attachment can't be migrated.** No Room migration does file I/O.
+- **Shared Uris across invoices are protected (Aug 2026 fix, still applies to legacy references):** two invoices may legitimately reference the exact same legacy `attachmentUri`. Before releasing any Uri's persisted permission — on update, delete, or migration — callers must confirm via `InvoiceRepository.countInvoicesWithAttachmentUri` that no other **persisted** invoice still needs it. Never reintroduce an unconditional release.
+- **Unsaved-changes:** attachment changes are part of `EditableInvoiceSnapshot` (via `attachmentFileName`); canceling the SAF picker must not itself count as a change.
 - **Export/Share Sheet unaffected:** CSV export, Export all data ZIP, and Share Sheet do not include attachment files — do not add them without an explicit request.
 
 ---
@@ -194,7 +197,7 @@ Invoice CSV export uses **`visibleInvoices`** (and category name/titles from UiS
 | **Export scope & format** | Invoice export = visible only; ZIP skips empty invoice CSVs |
 | **Share Sheet scope** | Sharing must reuse existing export bytes as-is; do not add Gmail/Drive-specific APIs, Google auth, or a custom sharing UI |
 | **Backup format / restore semantics** | Full replace; validate before delete; preserve IDs |
-| **Invoice attachments** | Local-only (Uri reference, no file copy, not yet in backup/restore); do not release the saved attachment's SAF permission before a real save |
+| **Invoice attachments** | Local-only (copied into app-private `filesDir/invoice_attachments/`, not yet in backup/restore); do not delete a saved managed file, or release a legacy Uri permission, before a real save/delete succeeds and no other invoice still references it |
 | **Localization** | Both `values/` and `values-iw/` |
 | **Back navigation (`popIfSafe` + BackHandler)** | `popIfSafe()` in Navigation.kt and `BackHandler(enabled = true)` at CategoryList root must stay; removing either re-exposes the blank-screen bug on rapid back presses |
 
@@ -222,11 +225,13 @@ Ask before: DB migrations, conflating export with backup, allowing CSV restore, 
 
 **Invoice attachments (Aug 2026):** Added one optional local image/PDF attachment per invoice — see the do-not-regress subsection above. SAF `OpenDocument` + persisted read Uri permission (no file copy into app storage); Room bumped 14 → 15 (`MIGRATION_14_15`, additive `attachmentUri TEXT` column); Add/Edit forms gained an Attachment section wired into unsaved-changes detection; Invoice Details gained an Attachment section with an "Open" action (`ACTION_VIEW`, graceful failure via snackbar). **Local-only** — excluded from backup/restore DTOs on purpose; export/Share Sheet unchanged. Next launch-prep stage: attachment-aware backup/restore.
 
+**Invoice attachment storage refactor (Aug 2026):** Replaced the external-Uri-only strategy above with a copy-into-app-private-storage strategy — see the do-not-regress subsection above. New picks are copied into `filesDir/invoice_attachments/` (`AttachmentStorage.kt`) instead of relying on a persisted external Uri; `Invoice`/`InvoiceEntity` gained `attachmentFileName`/`attachmentDisplayName`/`attachmentMimeType` (Room bumped 15 → 16, `MIGRATION_15_16`, additive columns); pre-existing `attachmentUri` invoices migrate lazily on list load (`InvoiceListViewModel.migrateLegacyAttachmentIfNeeded`) and are left untouched if the source is inaccessible. Opening uses the app's `FileProvider` for managed files (legacy Uris still open directly). Still **local-only** — attachment fields remain excluded from backup/restore; export/Share Sheet unchanged.
+
 ---
 
 ## 11) Project status (Jun 2026)
 
-**Done:** Room, bilingual UI, custom fields, search/filter/sort, service period, category reorder, UI polish, pre-launch refactor, user-facing export (CSV + ZIP), Android Share Sheet support for export, backup creation, full-replace restore, targeted unit tests (S9), GitHub Actions CI (S10), release polish (S11), documentation polish (S12), release identity (S13 — `com.dinyairsadot.clearledger`, v1.0.0), pre-release polish pass (dialog colors, navigation fix, custom field UI, locale/seeding fixes), one local image/PDF attachment per invoice (Aug 2026, local-only).
+**Done:** Room, bilingual UI, custom fields, search/filter/sort, service period, category reorder, UI polish, pre-launch refactor, user-facing export (CSV + ZIP), Android Share Sheet support for export, backup creation, full-replace restore, targeted unit tests (S9), GitHub Actions CI (S10), release polish (S11), documentation polish (S12), release identity (S13 — `com.dinyairsadot.clearledger`, v1.0.0), pre-release polish pass (dialog colors, navigation fix, custom field UI, locale/seeding fixes), one local image/PDF attachment per invoice (Aug 2026, local-only, now copied into app-private storage with lazy migration of pre-refactor invoices).
 
 **Next launch-prep stage:** attachment-aware backup/restore (not started).
 
@@ -252,6 +257,7 @@ Ask before: DB migrations, conflating export with backup, allowing CSV restore, 
 - ViewModel `Context` usage — optional cleanup
 - Future XLSX export for Google Sheets Android (not CSV hacks)
 - Instrumented restore transaction test (optional)
+- Category deletion cascade-deletes its invoices at the Room/SQL level (`ForeignKey.CASCADE`), bypassing `InvoiceListViewModel.deleteInvoice` — leaks legacy attachment Uri permissions and orphans managed attachment files on disk for those invoices; pre-existing, not introduced by the Aug 2026 attachment work, worth a dedicated follow-up
 
 ---
 

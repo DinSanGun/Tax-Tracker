@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Paths exposed via FileProvider for sharing exported files through the Android Share Sheet.
-     Only the app's own cache "exports" subdirectory is exposed; no broader storage access. -->
+<!-- Paths exposed via FileProvider. Only the app's own cache "exports" subdirectory (Share
+     Sheet) and files "invoice_attachments" subdirectory (managed invoice attachment copies)
+     are exposed; no broader storage access. -->
 <paths>
     <cache-path name="exports" path="exports/" />
+    <files-path name="invoice_attachments" path="invoice_attachments/" />
 </paths>

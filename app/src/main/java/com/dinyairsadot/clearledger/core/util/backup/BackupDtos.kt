@@ -38,10 +38,13 @@ data class BackupCategoryDto(
 )
 
 /**
- * Intentionally does **not** include [com.dinyairsadot.clearledger.core.domain.Invoice.attachmentUri].
- * Invoice attachment references are local to the device and attachment file backup/restore
- * will be implemented in the next stage. Existing backups created before the attachment
- * feature remain restorable unchanged; new backups simply omit attachment info for now.
+ * Intentionally does **not** include any of [com.dinyairsadot.clearledger.core.domain.Invoice]'s
+ * attachment fields (`attachmentUri`, `attachmentFileName`, `attachmentDisplayName`,
+ * `attachmentMimeType`). Invoice attachments — including the managed app-private copies
+ * introduced alongside these fields — are local to the device; attachment-aware backup/restore
+ * (including packaging the managed files themselves into the backup ZIP) remains the next
+ * stage. Existing backups created before the attachment feature remain restorable unchanged;
+ * new backups simply omit attachment info for now.
  */
 data class BackupInvoiceDto(
     val id: Long,

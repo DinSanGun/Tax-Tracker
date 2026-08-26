@@ -29,6 +29,7 @@ internal data class EditableInvoiceSnapshot(
     val vendorName: String,
     val notes: String,
     val customFieldValues: List<String>,
+    val attachmentFileName: String,
     val attachmentUri: String
 )
 
@@ -54,6 +55,7 @@ internal fun editableInvoiceSnapshot(
     vendorName: String,
     notes: String,
     customFieldValues: List<String>,
+    attachmentFileName: String = "",
     attachmentUri: String = ""
 ): EditableInvoiceSnapshot {
     return EditableInvoiceSnapshot(
@@ -78,6 +80,7 @@ internal fun editableInvoiceSnapshot(
         vendorName = vendorName.trim(),
         notes = notes.trim(),
         customFieldValues = customFieldValues.map { it.trim() },
+        attachmentFileName = attachmentFileName.trim(),
         attachmentUri = attachmentUri.trim()
     )
 }

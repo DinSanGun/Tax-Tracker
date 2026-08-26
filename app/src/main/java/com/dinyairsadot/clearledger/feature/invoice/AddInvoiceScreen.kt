@@ -68,7 +68,7 @@ import com.dinyairsadot.clearledger.core.ui.SwipeDismissSnackbarHost
 import com.dinyairsadot.clearledger.core.ui.UnsavedChangesDialog
 import com.dinyairsadot.clearledger.core.ui.categoryTopAppBarColors
 import com.dinyairsadot.clearledger.core.ui.requestAnchoredDropdownExpansion
-import com.dinyairsadot.clearledger.core.util.AttachmentUtil
+import com.dinyairsadot.clearledger.core.util.AttachmentStorage
 import androidx.compose.material3.LocalContentColor
 import java.time.LocalDate
 import java.time.YearMonth
@@ -103,9 +103,10 @@ fun AddInvoiceScreen(
         notes: String,
         customFieldValues: List<String>,
         amountCurrency: InvoiceCurrency,
-        attachmentUri: String?
+        attachmentFileName: String?,
+        attachmentDisplayName: String?,
+        attachmentMimeType: String?
     ) -> Unit,
-    isAttachmentUriInUse: suspend (String) -> Boolean,
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -147,8 +148,13 @@ fun AddInvoiceScreen(
     var customFieldValues by rememberSaveable {
         mutableStateOf(List(categoryCustomFieldTitles.size) { "" })
     }
-    var attachmentUri by rememberSaveable { mutableStateOf<String?>(null) }
+    // A picked file is copied into app-private storage immediately; these three fields
+    // together describe that managed copy. Add screen never has a legacy content:// Uri.
+    var attachmentFileName by rememberSaveable { mutableStateOf<String?>(null) }
+    var attachmentDisplayName by rememberSaveable { mutableStateOf<String?>(null) }
+    var attachmentMimeType by rememberSaveable { mutableStateOf<String?>(null) }
     var showUnsavedChangesDialog by rememberSaveable { mutableStateOf(false) }
+    val attachmentCopyFailedMessage = stringResource(R.string.attachment_copy_failed_message)
 
     // Validation state
     var documentNumberError by rememberSaveable { mutableStateOf<String?>(null) }
@@ -310,7 +316,9 @@ fun AddInvoiceScreen(
             notes.trim(),
             customFieldValues,
             runCatching { InvoiceCurrency.valueOf(amountCurrencyCode) }.getOrDefault(InvoiceCurrency.ILS),
-            attachmentUri
+            attachmentFileName,
+            attachmentDisplayName,
+            attachmentMimeType
         )
         onNavigateBack()
     }
@@ -338,6 +346,7 @@ fun AddInvoiceScreen(
             vendorName = "",
             notes = "",
             customFieldValues = List(categoryCustomFieldTitles.size) { "" },
+            attachmentFileName = "",
             attachmentUri = ""
         )
     }
@@ -363,7 +372,8 @@ fun AddInvoiceScreen(
         vendorName = vendorName,
         notes = notes,
         customFieldValues = customFieldValues,
-        attachmentUri = attachmentUri.orEmpty()
+        attachmentFileName = attachmentFileName.orEmpty(),
+        attachmentUri = ""
     ) != originalSnapshot
 
     fun onBackRequested() {
@@ -417,16 +427,14 @@ fun AddInvoiceScreen(
                 },
                 onDiscard = {
                     showUnsavedChangesDialog = false
-                    // A freshly-picked attachment was never saved on any invoice; release its
-                    // persisted read permission, unless another saved invoice already
-                    // references the exact same Uri.
-                    val pendingUri = attachmentUri
-                    coroutineScope.launch {
-                        AttachmentUtil.releaseIfUnreferenced(
-                            context = context,
-                            candidateUri = pendingUri,
-                            isReferencedElsewhere = isAttachmentUriInUse
-                        )
+                    // A freshly-picked attachment was never saved on any invoice, so its
+                    // managed copy is always safe to delete directly — it's a brand-new file
+                    // that nothing else could reference yet.
+                    val pendingFileName = attachmentFileName
+                    if (pendingFileName != null) {
+                        coroutineScope.launch {
+                            AttachmentStorage.deleteManagedFile(context, pendingFileName)
+                        }
                     }
                     onNavigateBack()
                 },
@@ -781,36 +789,34 @@ fun AddInvoiceScreen(
             )
 
             InvoiceAttachmentField(
-                attachmentUri = attachmentUri,
+                hasAttachment = attachmentFileName != null,
+                displayName = attachmentDisplayName,
                 onAttach = { uri ->
-                    val newUriString = uri.toString()
-                    AttachmentUtil.takePersistableReadPermission(context, uri)
-                    // Add screen never has a saved attachment yet, so any previous pick this
-                    // session is abandoned in favor of the new one — unless another saved
-                    // invoice already references that exact Uri, or the user re-picked the
-                    // exact same file (nothing to abandon in that case).
-                    val abandonedUri = attachmentUri
-                    if (abandonedUri != newUriString) {
-                        coroutineScope.launch {
-                            AttachmentUtil.releaseIfUnreferenced(
-                                context = context,
-                                candidateUri = abandonedUri,
-                                isReferencedElsewhere = isAttachmentUriInUse
-                            )
+                    coroutineScope.launch {
+                        val copied = AttachmentStorage.copyIntoManagedStorage(context, uri)
+                        if (copied == null) {
+                            snackbarHostState.showSnackbar(attachmentCopyFailedMessage)
+                            return@launch
                         }
+                        // Add screen never has a saved attachment yet, so any previous pick
+                        // this session is always a brand-new, never-saved file — safe to
+                        // delete directly in favor of the new one.
+                        attachmentFileName?.let { AttachmentStorage.deleteManagedFile(context, it) }
+                        attachmentFileName = copied.fileName
+                        attachmentDisplayName = copied.displayName
+                        attachmentMimeType = copied.mimeType
                     }
-                    attachmentUri = newUriString
                 },
                 onRemove = {
-                    val abandonedUri = attachmentUri
-                    coroutineScope.launch {
-                        AttachmentUtil.releaseIfUnreferenced(
-                            context = context,
-                            candidateUri = abandonedUri,
-                            isReferencedElsewhere = isAttachmentUriInUse
-                        )
+                    val abandonedFileName = attachmentFileName
+                    if (abandonedFileName != null) {
+                        coroutineScope.launch {
+                            AttachmentStorage.deleteManagedFile(context, abandonedFileName)
+                        }
                     }
-                    attachmentUri = null
+                    attachmentFileName = null
+                    attachmentDisplayName = null
+                    attachmentMimeType = null
                 }
             )
 

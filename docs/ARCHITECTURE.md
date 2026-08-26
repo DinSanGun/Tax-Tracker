@@ -3,7 +3,7 @@
 Concise architecture reference for developers, code review, and interview prep.  
 For user flows and package layout detail, see `docs/PROJECT_OVERVIEW.md`. For release planning, see `docs/LAUNCH_PLAN.md`.
 
-_Last updated: 2026-08-24_
+_Last updated: 2026-08-26_
 
 ---
 
@@ -11,7 +11,7 @@ _Last updated: 2026-08-24_
 
 Clear Ledger is a **local-first** Android app: categories define optional custom field schemas; invoices store aligned value lists and explicit service period modes. Clear Ledger does not send your data to the developer or operate its own cloud service; data is stored locally. User-initiated export and manual backup use Storage Access Framework (SAF). Android system backup may apply per device settings.
 
-**Stack:** Kotlin · Jetpack Compose (Material 3) · Navigation Compose · Room v15 · MVVM-style separation
+**Stack:** Kotlin · Jetpack Compose (Material 3) · Navigation Compose · Room v16 · MVVM-style separation
 
 ---
 
@@ -44,7 +44,7 @@ Clear Ledger is a **local-first** Android app: categories define optional custom
 
 - **Category:** `customFieldTitles: List<String>` (max 10), `orderIndex`, `seedKey`, `userEdited`, colors, pinned defaults
 - **Invoice:** core billing fields + `customFieldValues: List<String>` aligned **by index** to category titles
-- **Invoice.attachmentUri:** optional `String?` — persisted `content://` Uri of one local image/PDF attachment (Aug 2026); local-only, excluded from backup/restore
+- **Invoice attachment fields:** `attachmentFileName`/`attachmentDisplayName`/`attachmentMimeType` — one local image/PDF attachment (Aug 2026), copied into app-private storage; `attachmentUri` — legacy persisted `content://` Uri for invoices not yet migrated. All local-only, excluded from backup/restore
 - **ServicePeriodMode:** `MONTH` or `DATE` — explicit source of truth; never inferred from dates alone
 - **InvoiceCurrency:** ILS / USD display metadata only — amounts are not converted
 
@@ -60,7 +60,7 @@ See `core/domain/Models.kt` for full contracts.
 | `RoomInvoiceRepository` | CRUD per category, entity ↔ domain mapping |
 | `RoomBackupRestoreRepository` | Transactional full-replace restore from `BackupPayload` |
 
-Room database is currently **version 15** with incremental, non-destructive migrations. Avoid schema changes unless explicitly planned and tested.
+Room database is currently **version 16** with incremental, non-destructive migrations. Avoid schema changes unless explicitly planned and tested.
 
 ---
 
@@ -98,22 +98,24 @@ Both export flows above stage the same bytes they write to SAF in an app-cache f
 
 ---
 
-## Invoice attachments (Aug 2026, local-only)
+## Invoice attachments (Aug 2026, app-private storage, local-only)
 
-One optional image or PDF attachment per invoice, added/replaced/removed from the Add/Edit invoice form and opened from Invoice Details.
+One optional image or PDF attachment per invoice, added/replaced/removed from the Add/Edit invoice form and opened from Invoice Details. The picked document is copied into the app's own private storage, so the user can delete or move the original source file afterwards without breaking the attachment.
 
 | Step | Behavior |
 |------|----------|
 | Pick | `ActivityResultContracts.OpenDocument()`, `arrayOf("image/*", "application/pdf")` — standard SAF picker, no broad storage permission |
-| Store reference | `Invoice.attachmentUri: String?` holds the picker's `content://` Uri as-is; the document is **not copied into app storage** |
-| Survive restart | `ContentResolver.takePersistableUriPermission(uri, FLAG_GRANT_READ_URI_PERMISSION)` taken immediately at pick time (`core/util/AttachmentUtil.kt`) |
-| Release when safe | Old attachment released after a successful save that changes it, on invoice delete, or when an unsaved fresh pick is replaced/removed/discarded — the invoice's currently-*saved* Uri is never released before an actual save completes |
-| Open | `Intent.ACTION_VIEW` with the document's resolved MIME type + `FLAG_GRANT_READ_URI_PERMISSION`; whatever compatible viewer app is installed handles it |
-| Failures | Missing/inaccessible file or no compatible viewer app surface as a snackbar message (existing `SwipeDismissSnackbarHost` pattern) — never a crash |
+| Copy | The picked document's bytes are copied into `filesDir/invoice_attachments/` under a random, collision-safe filename, off the main thread (`core/util/AttachmentStorage.kt`); its display name and MIME type are captured at copy time and stored alongside, since they can't be re-queried once the source is gone |
+| Store reference | `Invoice.attachmentFileName`/`attachmentDisplayName`/`attachmentMimeType` reference the managed copy — the original source document is no longer needed after a successful copy |
+| Open | `Intent.ACTION_VIEW` on a `content://` Uri minted for the managed file via the app's `FileProvider` (`res/xml/file_paths.xml`, `invoice_attachments/` path entry) + `FLAG_GRANT_READ_URI_PERMISSION`; never `file://` |
+| Cleanup | A pending, never-saved copy (replaced again, removed, or the form discarded) is deleted directly — each copy is a brand-new file nothing else could reference yet. The invoice's actual saved managed file is deleted only after a real save/delete succeeds, and only if no other persisted invoice still references it (`InvoiceRepository.countInvoicesWithAttachmentFileName`) |
+| Failures | Missing/inaccessible file, a failed copy, or no compatible viewer app surface as a snackbar message (existing `SwipeDismissSnackbarHost` pattern) — never a crash |
 
-**Room:** `InvoiceEntity.attachmentUri` (nullable `TEXT`), added via `MIGRATION_14_15` (`ALTER TABLE invoices ADD COLUMN attachmentUri TEXT`); database bumped 14 → 15.
+**Legacy invoices:** those created before this storage strategy stored only a persisted external `content://` Uri (`Invoice.attachmentUri`). These migrate lazily — every time their invoice list loads, `InvoiceListViewModel.migrateLegacyAttachmentIfNeeded` tries to copy the legacy source into managed storage; if it's inaccessible, the invoice (and its legacy reference) is left untouched and retried on the next load. No Room migration performs file I/O directly.
 
-**Backup/restore limitation (temporary):** `attachmentUri` is deliberately excluded from `BackupInvoiceDto`/`BackupMapper` — invoice attachment references are local to the device and attachment file backup/restore will be implemented in the next stage. Existing backups remain restorable unchanged. CSV export, Export all data ZIP, and Share Sheet are unaffected.
+**Room:** `InvoiceEntity.attachmentUri` (legacy, nullable `TEXT`, added via `MIGRATION_14_15`); `attachmentFileName`/`attachmentDisplayName`/`attachmentMimeType` (nullable `TEXT`, added via `MIGRATION_15_16`, purely additive); database bumped 15 → 16.
+
+**Backup/restore limitation (temporary):** all attachment fields are deliberately excluded from `BackupInvoiceDto`/`BackupMapper` — the managed attachment copy is local to the device and attachment-aware backup/restore (including whether to package the files themselves into the backup ZIP) will be implemented in the next stage. Existing backups remain restorable unchanged. CSV export, Export all data ZIP, and Share Sheet are unaffected. No broad storage permission, `MediaStore`, or cloud storage is used.
 
 ---
 
@@ -167,7 +169,7 @@ Validation is layered so bad input never corrupts local data.
 3. Category list sorted by `orderIndex`, not name
 4. Export vs backup vs restore remain distinct product paths
 5. Hidden category fields (`supplierName`, `pinnedDefaults`) round-trip on update
-6. Invoice attachment (`attachmentUri`) changes count as unsaved changes in the add/edit form, same as any other field
+6. Invoice attachment changes (`attachmentFileName`/`attachmentUri`) count as unsaved changes in the add/edit form, same as any other field
 
 ### Automated tests (S9 — done)
 - Unit tests for export utilities, backup mapper/exporter/importer/validator

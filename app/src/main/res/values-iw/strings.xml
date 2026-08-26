@@ -171,6 +171,7 @@
     <string name="attachment_unknown_filename">קובץ מצורף</string>
     <string name="attachment_unavailable_message">לא ניתן יותר לגשת לצרופה זו</string>
     <string name="attachment_no_viewer_app_message">לא נמצאה אפליקציה שיכולה לפתוח קובץ זה</string>
+    <string name="attachment_copy_failed_message">לא ניתן היה לצרף את הקובץ. נסה שוב</string>
     
     <!-- Invoice Details Screen -->
     <string name="invoice_details">פרטי חשבונית</string>

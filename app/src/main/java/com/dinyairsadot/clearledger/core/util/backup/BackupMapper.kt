@@ -18,10 +18,11 @@ import java.time.format.DateTimeFormatter
  * defaults to legacy [Invoice.amount] when the DB column is null) are exported as their
  * effective values.
  *
- * [Invoice.attachmentUri] is deliberately **not** mapped to/from [BackupInvoiceDto]. Invoice
- * attachment references are local to the device and attachment file backup/restore will be
- * implemented in the next stage; restoring an old or new backup simply leaves attachmentUri
- * null.
+ * [Invoice.attachmentUri], [Invoice.attachmentFileName], [Invoice.attachmentDisplayName] and
+ * [Invoice.attachmentMimeType] are deliberately **not** mapped to/from [BackupInvoiceDto].
+ * Invoice attachments (including the managed app-private copy) are local to the device;
+ * attachment-aware backup/restore remains the next stage. Restoring an old or new backup
+ * simply leaves all attachment fields null, i.e. the restored invoice has no attachment.
  */
 object BackupMapper {
 

@@ -171,6 +171,7 @@
     <string name="attachment_unknown_filename">Attached file</string>
     <string name="attachment_unavailable_message">This attachment can no longer be accessed</string>
     <string name="attachment_no_viewer_app_message">No app found to open this file</string>
+    <string name="attachment_copy_failed_message">Couldn\'t attach this file. Please try again</string>
     
     <!-- Invoice Details Screen -->
     <string name="invoice_details">Invoice details</string>
