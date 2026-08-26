@@ -68,6 +68,7 @@ import com.dinyairsadot.clearledger.core.ui.SwipeDismissSnackbarHost
 import com.dinyairsadot.clearledger.core.ui.UnsavedChangesDialog
 import com.dinyairsadot.clearledger.core.ui.categoryTopAppBarColors
 import com.dinyairsadot.clearledger.core.ui.requestAnchoredDropdownExpansion
+import com.dinyairsadot.clearledger.core.util.AttachmentUtil
 import androidx.compose.material3.LocalContentColor
 import java.time.LocalDate
 import java.time.YearMonth
@@ -101,8 +102,10 @@ fun AddInvoiceScreen(
         vendorName: String?,
         notes: String,
         customFieldValues: List<String>,
-        amountCurrency: InvoiceCurrency
+        amountCurrency: InvoiceCurrency,
+        attachmentUri: String?
     ) -> Unit,
+    isAttachmentUriInUse: suspend (String) -> Boolean,
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -144,6 +147,7 @@ fun AddInvoiceScreen(
     var customFieldValues by rememberSaveable {
         mutableStateOf(List(categoryCustomFieldTitles.size) { "" })
     }
+    var attachmentUri by rememberSaveable { mutableStateOf<String?>(null) }
     var showUnsavedChangesDialog by rememberSaveable { mutableStateOf(false) }
 
     // Validation state
@@ -305,7 +309,8 @@ fun AddInvoiceScreen(
             vendorName.trim().takeIf { it.isNotBlank() },
             notes.trim(),
             customFieldValues,
-            runCatching { InvoiceCurrency.valueOf(amountCurrencyCode) }.getOrDefault(InvoiceCurrency.ILS)
+            runCatching { InvoiceCurrency.valueOf(amountCurrencyCode) }.getOrDefault(InvoiceCurrency.ILS),
+            attachmentUri
         )
         onNavigateBack()
     }
@@ -332,7 +337,8 @@ fun AddInvoiceScreen(
             confirmationNumber = "",
             vendorName = "",
             notes = "",
-            customFieldValues = List(categoryCustomFieldTitles.size) { "" }
+            customFieldValues = List(categoryCustomFieldTitles.size) { "" },
+            attachmentUri = ""
         )
     }
     val hasUnsavedChanges = editableInvoiceSnapshot(
@@ -356,7 +362,8 @@ fun AddInvoiceScreen(
         confirmationNumber = confirmationNumber,
         vendorName = vendorName,
         notes = notes,
-        customFieldValues = customFieldValues
+        customFieldValues = customFieldValues,
+        attachmentUri = attachmentUri.orEmpty()
     ) != originalSnapshot
 
     fun onBackRequested() {
@@ -410,6 +417,17 @@ fun AddInvoiceScreen(
                 },
                 onDiscard = {
                     showUnsavedChangesDialog = false
+                    // A freshly-picked attachment was never saved on any invoice; release its
+                    // persisted read permission, unless another saved invoice already
+                    // references the exact same Uri.
+                    val pendingUri = attachmentUri
+                    coroutineScope.launch {
+                        AttachmentUtil.releaseIfUnreferenced(
+                            context = context,
+                            candidateUri = pendingUri,
+                            isReferencedElsewhere = isAttachmentUriInUse
+                        )
+                    }
                     onNavigateBack()
                 },
                 onDismiss = { showUnsavedChangesDialog = false }
@@ -755,6 +773,45 @@ fun AddInvoiceScreen(
                     },
                 label = { Text(stringResource(R.string.notes_additional_info)) },
                 minLines = 3
+            )
+
+            InvoiceFormSectionHeader(
+                title = stringResource(R.string.attachment_section_title),
+                isFirstSection = false
+            )
+
+            InvoiceAttachmentField(
+                attachmentUri = attachmentUri,
+                onAttach = { uri ->
+                    val newUriString = uri.toString()
+                    AttachmentUtil.takePersistableReadPermission(context, uri)
+                    // Add screen never has a saved attachment yet, so any previous pick this
+                    // session is abandoned in favor of the new one — unless another saved
+                    // invoice already references that exact Uri, or the user re-picked the
+                    // exact same file (nothing to abandon in that case).
+                    val abandonedUri = attachmentUri
+                    if (abandonedUri != newUriString) {
+                        coroutineScope.launch {
+                            AttachmentUtil.releaseIfUnreferenced(
+                                context = context,
+                                candidateUri = abandonedUri,
+                                isReferencedElsewhere = isAttachmentUriInUse
+                            )
+                        }
+                    }
+                    attachmentUri = newUriString
+                },
+                onRemove = {
+                    val abandonedUri = attachmentUri
+                    coroutineScope.launch {
+                        AttachmentUtil.releaseIfUnreferenced(
+                            context = context,
+                            candidateUri = abandonedUri,
+                            isReferencedElsewhere = isAttachmentUriInUse
+                        )
+                    }
+                    attachmentUri = null
+                }
             )
 
             Spacer(modifier = Modifier.padding(top = 16.dp))

@@ -17,6 +17,10 @@ interface InvoiceDao {
     
     @Query("SELECT * FROM invoices WHERE id = :id")
     suspend fun getById(id: Long): InvoiceEntity?
+
+    /** Number of invoices currently persisting [attachmentUri] on their `attachmentUri` column. */
+    @Query("SELECT COUNT(*) FROM invoices WHERE attachmentUri = :attachmentUri")
+    suspend fun countByAttachmentUri(attachmentUri: String): Int
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(invoice: InvoiceEntity): Long

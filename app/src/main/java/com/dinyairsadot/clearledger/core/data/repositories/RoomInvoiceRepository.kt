@@ -35,4 +35,8 @@ class RoomInvoiceRepository(
     override suspend fun deleteInvoice(id: Long) {
         invoiceDao.deleteById(id)
     }
+
+    override suspend fun countInvoicesWithAttachmentUri(attachmentUri: String): Int {
+        return invoiceDao.countByAttachmentUri(attachmentUri)
+    }
 }

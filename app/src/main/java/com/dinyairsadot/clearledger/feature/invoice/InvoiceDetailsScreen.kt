@@ -2,6 +2,7 @@ package com.dinyairsadot.clearledger.feature.invoice
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,11 +16,15 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -35,9 +40,12 @@ import com.dinyairsadot.clearledger.core.domain.DocumentType
 import com.dinyairsadot.clearledger.feature.invoice.formatServicePeriodForDisplay
 import com.dinyairsadot.clearledger.core.domain.PaymentStatus
 import com.dinyairsadot.clearledger.core.domain.PaymentMethodOption
+import com.dinyairsadot.clearledger.core.ui.SwipeDismissSnackbarHost
 import com.dinyairsadot.clearledger.core.ui.categoryTopAppBarColors
+import com.dinyairsadot.clearledger.core.util.AttachmentUtil
 import androidx.compose.material3.LocalContentColor
 import com.dinyairsadot.clearledger.R
+import kotlinx.coroutines.launch
 
 
 
@@ -51,7 +59,14 @@ fun InvoiceDetailsScreen(
     categoryColorHex: String?
 ) {
     val currentLocale = LocalConfiguration.current.locales[0]
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val attachmentUnavailableMessage = stringResource(R.string.attachment_unavailable_message)
+    val attachmentNoViewerMessage = stringResource(R.string.attachment_no_viewer_app_message)
+
     Scaffold(
+        snackbarHost = { SwipeDismissSnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -275,6 +290,41 @@ fun InvoiceDetailsScreen(
                                 text = notes,
                                 style = MaterialTheme.typography.bodyMedium
                             )
+                        }
+
+                        invoice.attachmentUri?.takeIf { it.isNotBlank() }?.let { attachmentUri ->
+                            val attachmentDisplayName = rememberAttachmentDisplayName(attachmentUri)
+                            Spacer(modifier = Modifier.padding(top = 8.dp))
+                            Text(
+                                text = stringResource(R.string.attachment_section_title),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.padding(top = 2.dp))
+                            Text(
+                                text = attachmentDisplayName
+                                    ?: stringResource(R.string.attachment_unknown_filename),
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.padding(top = 2.dp))
+                            TextButton(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        when (AttachmentUtil.openAttachment(context, attachmentUri)) {
+                                            AttachmentUtil.OpenResult.Opened -> Unit
+                                            AttachmentUtil.OpenResult.NotAccessible ->
+                                                snackbarHostState.showSnackbar(attachmentUnavailableMessage)
+                                            AttachmentUtil.OpenResult.NoViewerApp ->
+                                                snackbarHostState.showSnackbar(attachmentNoViewerMessage)
+                                        }
+                                    }
+                                },
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Text(stringResource(R.string.attachment_open_action))
+                            }
                         }
                     }
                 }

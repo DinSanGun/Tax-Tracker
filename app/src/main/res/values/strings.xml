@@ -160,6 +160,17 @@
     <string name="paid">Paid</string>
     <string name="paid_full">Paid full</string>
     <string name="paid_credit">Paid credit</string>
+
+    <!-- Invoice Attachment (image/PDF, local-only for now) -->
+    <string name="attachment_section_title">Attachment</string>
+    <string name="attachment_none">No attachment</string>
+    <string name="attachment_attach_action">Attach image or PDF</string>
+    <string name="attachment_replace_action">Replace</string>
+    <string name="attachment_remove_action">Remove</string>
+    <string name="attachment_open_action">Open</string>
+    <string name="attachment_unknown_filename">Attached file</string>
+    <string name="attachment_unavailable_message">This attachment can no longer be accessed</string>
+    <string name="attachment_no_viewer_app_message">No app found to open this file</string>
     
     <!-- Invoice Details Screen -->
     <string name="invoice_details">Invoice details</string>

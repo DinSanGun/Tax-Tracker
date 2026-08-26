@@ -23,6 +23,7 @@ For the pre-release execution plan, see `docs/LAUNCH_PLAN.md`. For architecture 
 2. **Invoice management**
    - Select category → invoice list (search, filter, sort)
    - Add / view details / edit / delete invoice
+   - **Attachment** (Aug 2026) → attach one image/PDF per invoice from the add/edit form (SAF `OpenDocument`); view/replace/remove; open from Invoice Details via the device's own viewer app. Local to the device only — not yet part of backup/restore
    - **Export** → localized CSV of currently visible invoices via SAF
    - After export completes, an optional **Share** action on the confirmation snackbar opens the standard Android Share Sheet for that CSV
 
@@ -70,7 +71,7 @@ com.dinyairsadot.clearledger/
 │   │   ├── CategoryRepository.kt
 │   │   └── InvoiceRepository.kt
 │   ├── data/
-│   │   ├── ClearLedgerDatabase.kt  # Room v14, migrations
+│   │   ├── ClearLedgerDatabase.kt  # Room v15, migrations
 │   │   ├── dao/, entities/, converters/, repositories/
 │   │   │   └── RoomBackupRestoreRepository.kt
 │   │   ├── LanguagePreferenceManager.kt
@@ -86,13 +87,14 @@ com.dinyairsadot.clearledger/
 │       ├── Utf8CsvWriter.kt, AllDataZipExporter.kt
 │       ├── CategoriesCsvLabels.kt, AllExportData.kt
 │       ├── ShareExportUtil.kt   # Share Sheet: FileProvider Uri + ACTION_SEND chooser
+│       ├── AttachmentUtil.kt    # Invoice attachment: persisted SAF permission, open intent
 │       └── backup/
 │           ├── BackupFormat.kt, BackupDtos.kt, BackupMapper.kt
 │           ├── BackupZipExporter.kt, BackupZipImporter.kt
 │           └── BackupValidator.kt, BackupValidationResult.kt
 ├── feature/
 │   ├── category/                # List, add, edit, reorder, CategoryForm
-│   ├── invoice/                 # List, add, edit, details, search/filter/sort
+│   ├── invoice/                 # List, add, edit, details, search/filter/sort, attachment field
 │   └── settings/                # SettingsScreen (hub), LanguageSettingsScreen, AboutScreen
 ├── ui/theme/                    # Material 3 theme
 └── archive/                     # Unused in-memory repos (reference only)
@@ -146,6 +148,7 @@ Backward-compat getters: `customFieldTitle1..3`
 - `servicePeriodMode: ServicePeriodMode` — `MONTH` or `DATE` (explicit source of truth)
 - Payment: `paymentMethod`, `numberOfPayments`, `confirmationNumber`
 - `customFieldValues: List<String>` — aligned by index to category titles
+- `attachmentUri: String?` (Aug 2026) — persisted `content://` Uri of one optional local image/PDF attachment; null if none. Local-only for now — excluded from backup/restore DTOs
 - Legacy fields retained for migration: `invoiceNumber`, `amount`, etc.
 
 ### Enums
@@ -156,13 +159,14 @@ Backward-compat getters: `customFieldTitle1..3`
 - `PaymentMethodOption`: includes `NOT_SPECIFIED`, `CREDIT`, `OTHER`, etc.
 
 ### Planned / partial types
-- `CustomFieldDefinition`, `InvoiceCustomFieldValue`, `InvoiceImage` — defined for future use; active UI uses indexed title/value lists
+- `CustomFieldDefinition`, `InvoiceCustomFieldValue` — defined for future use; active UI uses indexed title/value lists
+- `InvoiceImage` — an older, unused placeholder type; the shipped attachment feature uses `Invoice.attachmentUri` directly instead (single attachment per invoice, no separate table)
 
 ---
 
 ## F. Data Layer
 
-**Room database:** version **14**, non-destructive migration chain.
+**Room database:** version **15**, non-destructive migration chain.
 
 **Repositories:**
 - `RoomCategoryRepository` — CRUD, seeded localization, `updateCategoryOrder()`
@@ -171,7 +175,7 @@ Backward-compat getters: `customFieldTitle1..3`
 
 **Entity highlights:**
 - `CategoryEntity` — `customFieldTitlesJson`, `orderIndex`, `seedKey`, `userEdited`
-- `InvoiceEntity` — converters for dates, enums, JSON lists/maps, `amountCurrencyCode`
+- `InvoiceEntity` — converters for dates, enums, JSON lists/maps, `amountCurrencyCode`, `attachmentUri` (nullable `TEXT`, added in migration 14→15)
 
 **CategoryRepository extras:**
 - `updateLocalizedSeededCategories(context)` — refresh unedited seeded names/descriptions
@@ -257,6 +261,7 @@ ViewModels expose immutable `UiState` data classes via `StateFlow`.
 6. **ViewModel scope:** Invoice/category mutations must go through the shared parent ViewModel so list state stays consistent.
 7. **Migrations:** Avoid new DB migrations unless explicitly requested and tested.
 8. **Export vs backup vs restore:** User-facing export (CSV/ZIP) is localized and spreadsheet-oriented — **not for restore**. Backup (ZIP with `backup.json`) is restore-ready raw app data. Restore is full replace only and accepts backup ZIPs, not CSV exports.
+9. **Invoice attachments are local-only (for now):** `Invoice.attachmentUri` is excluded from `BackupInvoiceDto`/`BackupMapper` on purpose — do not add it there until attachment-aware backup/restore is explicitly implemented as its own stage.
 
 ---
 
@@ -278,9 +283,28 @@ ViewModels expose immutable `UiState` data classes via `StateFlow`.
 
 **Share Sheet (Aug 2026):** After either export succeeds, the same bytes written to SAF are also staged in `cacheDir/exports/` and exposed as a temporary `content://` Uri via `androidx.core.content.FileProvider` (`core/util/ShareExportUtil.kt`). A **Share** action on the success snackbar opens the standard Android Share Sheet (`Intent.ACTION_SEND` + `Intent.createChooser`) with read permission granted only to the app the user picks. No `file://` Uri, no broad storage permission, and no direct Gmail/Drive/WhatsApp integration — the chooser just lists installed apps that accept the file's MIME type.
 
+**Invoice attachments are excluded (Aug 2026):** the optional per-invoice image/PDF attachment (see section M) is not included in invoice CSV rows or the all-data ZIP — export scope and format are unchanged by the attachment feature.
+
 ---
 
-## M. Backup and Restore (implemented)
+## M. Invoice Attachments (implemented, local-only)
+
+**Product scope:** one optional image or PDF attachment per invoice, attach/replace/remove from the add/edit form, view from Invoice Details.
+
+| Step | Behavior |
+|------|----------|
+| Pick | `ActivityResultContracts.OpenDocument()`, `arrayOf("image/*", "application/pdf")` |
+| Persist reference | `Invoice.attachmentUri: String?` stores the picker's `content://` Uri as-is — **no copy into app storage** |
+| Keep accessible after restart | `ContentResolver.takePersistableUriPermission(uri, FLAG_GRANT_READ_URI_PERMISSION)` taken at pick time (`core/util/AttachmentUtil.kt`) |
+| Release when no longer referenced | On save (attachment changed), on invoice delete, or when a freshly-picked-but-unsaved attachment is replaced/removed/discarded — never releases the invoice's currently-*saved* attachment before a real save happens |
+| Open | `Intent.ACTION_VIEW` with the document's own MIME type + `FLAG_GRANT_READ_URI_PERMISSION`, resolved to whatever viewer app is installed |
+| Failure handling | Missing/inaccessible file or no compatible viewer app → snackbar message, never a crash |
+
+**Known limitation (temporary):** invoice attachment references are local to the device and attachment file backup/restore will be implemented in the next stage. `BackupInvoiceDto` / `BackupMapper` deliberately exclude `attachmentUri`, so existing backups remain restorable unchanged and new backups simply omit attachment info. CSV export, Export all data ZIP, and the Share Sheet are unaffected.
+
+---
+
+## N. Backup and Restore (implemented)
 
 **Product distinction:** Backup = restore-ready app data in plaintext JSON. Restore = full replacement of local categories and invoices from a backup ZIP.
 
@@ -301,10 +325,10 @@ ViewModels expose immutable `UiState` data classes via `StateFlow`.
 
 ---
 
-## N. Current Status and Evolving Areas
+## O. Current Status and Evolving Areas
 
 **Stable / complete for MVP:**
-- Room persistence (v14), incremental migrations
+- Room persistence (v15), incremental migrations
 - Category and invoice CRUD
 - Dynamic custom fields (indexed title/value lists)
 - Invoice search, filter, sort (`sourceInvoices` → `visibleInvoices`)
@@ -316,6 +340,7 @@ ViewModels expose immutable `UiState` data classes via `StateFlow`.
 - **User-facing export:** invoice-list CSV + category-list all-data ZIP (Jun 2026)
 - **Android Share Sheet support for export** (Aug 2026): optional Share action after export, via `FileProvider` + `ACTION_SEND`
 - **Backup and restore:** create backup + full-replace restore (Jun 2026)
+- **Invoice attachments** (Aug 2026): one local image/PDF attachment per invoice via SAF + persisted Uri permission; **local-only** — not yet in backup/restore (next launch-prep stage)
 - **Targeted unit tests** (S9), **GitHub Actions CI** (S10), **release polish** (S11)
 - **Release identity** (`com.dinyairsadot.clearledger`, v1.0.0, launcher icon) and **documentation polish** (S12)
 - **Pre-release polish pass (Jun 2026):** dialog action color semantics, rapid-back navigation fix, custom field UI improvements, locale/seeding correctness fixes
@@ -323,7 +348,7 @@ ViewModels expose immutable `UiState` data classes via `StateFlow`.
 **Not yet implemented:**
 - Play Store production release
 - Cloud sync, encryption, automatic backup, selective merge restore
-- Receipt image/PDF attachments (next launch-prep stage)
+- Attachment-aware backup/restore (next launch-prep stage after invoice attachments)
 
 **Pre-release focus (see `docs/LAUNCH_PLAN.md` S9–S17):**
 - **Done:** S9 tests, S10 CI, S11 release polish, S12 docs, S13 release identity, S14 repo deliverables (privacy policy, store materials, screenshots, icon)
@@ -342,4 +367,4 @@ ViewModels expose immutable `UiState` data classes via `StateFlow`.
 
 ## Summary
 
-Clear Ledger is a Kotlin + Jetpack Compose Android app using MVVM, Room, and Navigation Compose. Categories define optional custom field schemas; invoices store aligned value lists and explicit service period modes. The invoice list recomputes visible results through a single ViewModel pipeline. The app supports Hebrew and English with manual switching and locale-aware seeded data. User-facing export and restore-ready backup/restore are implemented via Storage Access Framework. **S14 repo deliverables are complete;** remaining external tasks are hosted privacy policy URL verification and Play Console entry. **Next focus:** S15 internal Play testing (signing). See `docs/LAUNCH_PLAN.md` and `docs/RELEASE.md`.
+Clear Ledger is a Kotlin + Jetpack Compose Android app using MVVM, Room, and Navigation Compose. Categories define optional custom field schemas; invoices store aligned value lists and explicit service period modes. The invoice list recomputes visible results through a single ViewModel pipeline. The app supports Hebrew and English with manual switching and locale-aware seeded data. User-facing export and restore-ready backup/restore are implemented via Storage Access Framework. Invoices now support one optional local image/PDF attachment via SAF and a persisted Uri permission — local-only for now; attachment-aware backup/restore is the next launch-prep stage. **S14 repo deliverables are complete;** remaining external tasks are hosted privacy policy URL verification and Play Console entry. **Next focus:** S15 internal Play testing (signing). See `docs/LAUNCH_PLAN.md` and `docs/RELEASE.md`.

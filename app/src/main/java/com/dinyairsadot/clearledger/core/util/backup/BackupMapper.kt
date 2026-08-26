@@ -17,6 +17,11 @@ import java.time.format.DateTimeFormatter
  * complete. Known implication: fields filled by domain fallbacks (e.g. [Invoice.amountDue]
  * defaults to legacy [Invoice.amount] when the DB column is null) are exported as their
  * effective values.
+ *
+ * [Invoice.attachmentUri] is deliberately **not** mapped to/from [BackupInvoiceDto]. Invoice
+ * attachment references are local to the device and attachment file backup/restore will be
+ * implemented in the next stage; restoring an old or new backup simply leaves attachmentUri
+ * null.
  */
 object BackupMapper {
 

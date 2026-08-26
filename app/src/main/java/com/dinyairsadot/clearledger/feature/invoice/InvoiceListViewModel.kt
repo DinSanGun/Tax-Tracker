@@ -11,6 +11,7 @@ import com.dinyairsadot.clearledger.core.domain.InvoiceCurrency
 import com.dinyairsadot.clearledger.core.domain.InvoiceRepository
 import com.dinyairsadot.clearledger.core.domain.PaymentStatus
 import com.dinyairsadot.clearledger.core.domain.ServicePeriodMode
+import com.dinyairsadot.clearledger.core.util.AttachmentUtil
 import com.dinyairsadot.clearledger.core.util.InvoiceCsvExportLabels
 import com.dinyairsadot.clearledger.core.util.InvoiceCsvExporter
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -67,7 +68,9 @@ data class InvoiceUi(
     val pinnedSnapshot: Map<String, String> = emptyMap(),
     // Explicit mode; never infer this from dates.
     val servicePeriodMode: ServicePeriodMode = ServicePeriodMode.MONTH,
-    val amountCurrency: InvoiceCurrency = InvoiceCurrency.ILS
+    val amountCurrency: InvoiceCurrency = InvoiceCurrency.ILS,
+    /** Persisted `content://` Uri string of the single local attachment; null if none. */
+    val attachmentUri: String? = null
 )
 
 data class InvoiceListUiState(
@@ -343,7 +346,8 @@ class InvoiceListViewModel(
         vendorName: String?,
         notes: String,
         customFieldValues: List<String> = emptyList(),
-        amountCurrency: InvoiceCurrency = InvoiceCurrency.ILS
+        amountCurrency: InvoiceCurrency = InvoiceCurrency.ILS,
+        attachmentUri: String? = null
     ) {
         viewModelScope.launch {
             try {
@@ -389,7 +393,8 @@ class InvoiceListViewModel(
                     // Pinned snapshot: capture category defaults at creation time
                     pinnedSnapshot = pinnedSnapshot,
                     servicePeriodMode = servicePeriodMode,
-                    amountCurrency = amountCurrency
+                    amountCurrency = amountCurrency,
+                    attachmentUri = attachmentUri
                 )
 
                 invoiceRepository.addInvoice(newInvoice)
@@ -404,6 +409,15 @@ class InvoiceListViewModel(
 
     suspend fun getInvoice(invoiceId: Long): Invoice? {
         return invoiceRepository.getInvoiceById(invoiceId)
+    }
+
+    /**
+     * True if any persisted invoice currently has [attachmentUri] as its `attachmentUri`.
+     * Used by the add/edit forms to avoid releasing a persisted SAF read permission for a
+     * freshly-picked-but-unsaved Uri that another saved invoice already depends on.
+     */
+    suspend fun isAttachmentUriReferenced(attachmentUri: String): Boolean {
+        return invoiceRepository.countInvoicesWithAttachmentUri(attachmentUri) > 0
     }
 
     fun updateInvoice(
@@ -422,7 +436,8 @@ class InvoiceListViewModel(
         vendorName: String?,
         notes: String,
         customFieldValues: List<String> = emptyList(),
-        amountCurrency: InvoiceCurrency = InvoiceCurrency.ILS
+        amountCurrency: InvoiceCurrency = InvoiceCurrency.ILS,
+        attachmentUri: String? = null
     ) {
         viewModelScope.launch {
             try {
@@ -457,10 +472,21 @@ class InvoiceListViewModel(
                     numberOfPayments = numberOfPayments,
                     confirmationNumber = confirmationNumber,
                     servicePeriodMode = servicePeriodMode,
-                    amountCurrency = amountCurrency
+                    amountCurrency = amountCurrency,
+                    attachmentUri = attachmentUri
                 )
 
                 invoiceRepository.updateInvoice(updated)
+
+                // The old attachment (if replaced or removed) may still be referenced by a
+                // *different* invoice that happens to point at the same Uri, so only release
+                // its persisted SAF read permission once no persisted invoice needs it anymore.
+                // The new attachment's permission was already taken when the user picked it.
+                if (existing.attachmentUri != attachmentUri) {
+                    AttachmentUtil.releaseIfUnreferenced(context, existing.attachmentUri) { uri ->
+                        invoiceRepository.countInvoicesWithAttachmentUri(uri) > 0
+                    }
+                }
 
                 // Refresh list so InvoiceListScreen sees updated data
                 loadInvoices(existing.categoryId)
@@ -478,7 +504,15 @@ class InvoiceListViewModel(
     ) {
         viewModelScope.launch {
             try {
+                val existing = invoiceRepository.getInvoiceById(invoiceId)
                 invoiceRepository.deleteInvoice(invoiceId)
+                // Another invoice may still reference the same attachment Uri; only release
+                // the persisted permission once no persisted invoice needs it anymore.
+                existing?.attachmentUri?.let { uri ->
+                    AttachmentUtil.releaseIfUnreferenced(context, uri) { candidateUri ->
+                        invoiceRepository.countInvoicesWithAttachmentUri(candidateUri) > 0
+                    }
+                }
                 // Refresh list so InvoiceListScreen sees updated data
                 loadInvoices(categoryId)
             } catch (e: Exception) {
@@ -518,6 +552,7 @@ private fun Invoice.toUi(): InvoiceUi {
         confirmationNumber = this.confirmationNumber,
         pinnedSnapshot = this.pinnedSnapshot,
         servicePeriodMode = this.servicePeriodMode,
-        amountCurrency = this.amountCurrency
+        amountCurrency = this.amountCurrency,
+        attachmentUri = this.attachmentUri
     )
 }

@@ -43,6 +43,7 @@ The app targets real-world billing and tax workflows, including Israel-specific 
 - Separate payment date and due date from service period
 - Document type, payment method (including custom “Other”), and credit payment count
 - Currency stored and displayed as metadata (ILS / USD); amounts are not converted
+- **One optional image/PDF attachment per invoice** — attach, replace, or remove from the add/edit form; view from Invoice Details via the device's own viewer app; picked with Android's Storage Access Framework and kept accessible after restart via a persisted read permission (no broad storage permission, no copy into app storage). **Local to the device only** — not yet included in backup/restore (see Data Portability below)
 
 ### Invoice List Productivity
 - Search by invoice number or amount with mode selector
@@ -101,8 +102,10 @@ The app offers three distinct data portability features. **Do not confuse them:*
 
 > **Before restoring:** create a fresh backup of your current data if you may want to return to the present state. Restore cannot be undone unless you have another backup.
 
+> **Attachment limitation:** invoice attachment references (image/PDF) are local to the device only. Backup, restore, CSV export, and Export all data do **not** yet include attachment files — this is planned for a follow-up stage.
+
 ### Local Persistence
-- Offline-first design with Room (SQLite), currently at schema version 14
+- Offline-first design with Room (SQLite), currently at schema version 15
 - Incremental migrations for backward compatibility
 - First-run seeding with idempotent preference flags
 
@@ -114,7 +117,7 @@ The app offers three distinct data portability features. **Do not confuse them:*
 - **UI:** Jetpack Compose (Material 3)
 - **Navigation:** Navigation Compose
 - **Architecture:** MVVM-style separation (UI / ViewModel / Repository)
-- **Persistence:** Room (schema version 14) with KSP, entity ↔ domain mapping
+- **Persistence:** Room (schema version 15) with KSP, entity ↔ domain mapping
 - **State:** ViewModels + `StateFlow`, lifecycle-aware collection
 - **Localization:** Android string resources (`values/`, `values-iw/`) with RTL support
 - **Build:** Gradle (KTS), version catalog

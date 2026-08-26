@@ -129,7 +129,16 @@ data class Invoice(
     // Explicit mode – source of truth; chosen per-invoice in the form.
     val servicePeriodMode: ServicePeriodMode = ServicePeriodMode.MONTH,
     /** Stored display currency; existing DB rows default to ILS via migration. */
-    val amountCurrency: InvoiceCurrency = InvoiceCurrency.ILS
+    val amountCurrency: InvoiceCurrency = InvoiceCurrency.ILS,
+    /**
+     * Persisted `content://` Uri string of the single local image/PDF attachment for this
+     * invoice, or null if none. The underlying document is never copied into app storage;
+     * access relies on a persisted SAF read permission grant (see `AttachmentUtil`).
+     *
+     * Local-only for now: attachment references are not yet included in backup/restore
+     * (see `core/util/backup/BackupMapper.kt`).
+     */
+    val attachmentUri: String? = null
 ) {
     // Backward compatibility: getters for old field names
     val customFieldValue1: String? get() = customFieldValues.getOrNull(0)

@@ -64,7 +64,9 @@ data class InvoiceEntity(
     // Explicit service-period input mode. Non-null; migration sets DEFAULT 'MONTH'.
     val servicePeriodMode: ServicePeriodMode = ServicePeriodMode.MONTH,
     /** [InvoiceCurrency.name]; migration defaults existing rows to ILS. */
-    val amountCurrencyCode: String = InvoiceCurrency.ILS.name
+    val amountCurrencyCode: String = InvoiceCurrency.ILS.name,
+    /** Persisted `content://` Uri string of the single local attachment; null if none. */
+    val attachmentUri: String? = null
 ) {
     fun toDomain(): Invoice {
         val issueDate = issueDateEpochDay?.let { 
@@ -125,7 +127,8 @@ data class InvoiceEntity(
             confirmationNumber = confirmationNumber,
             pinnedSnapshot = pinnedSnapshot,
             servicePeriodMode = servicePeriodMode,
-            amountCurrency = amountCurrency
+            amountCurrency = amountCurrency,
+            attachmentUri = attachmentUri
         )
     }
     
@@ -186,7 +189,8 @@ data class InvoiceEntity(
                 confirmationNumber = invoice.confirmationNumber,
                 pinnedSnapshotJson = pinnedSnapshotJson,
                 servicePeriodMode = invoice.servicePeriodMode,
-                amountCurrencyCode = invoice.amountCurrency.name
+                amountCurrencyCode = invoice.amountCurrency.name,
+                attachmentUri = invoice.attachmentUri
             )
         }
     }

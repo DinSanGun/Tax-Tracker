@@ -384,7 +384,7 @@ fun ClearLedgerNavHost(
                 categoryName = uiState.categoryName,
                 categoryColorHex = uiState.categoryColorHex,
                 categoryCustomFieldTitles = uiState.categoryCustomFieldTitles,
-                onSaveInvoice = { documentNumber, amountDue, paymentStatus, servicePeriodStartText, servicePeriodEndText, servicePeriodMode, paymentDate, dueDate, paymentMethod, numberOfPayments, confirmationNumber, vendorName, notes, customFieldValues, amountCurrency ->
+                onSaveInvoice = { documentNumber, amountDue, paymentStatus, servicePeriodStartText, servicePeriodEndText, servicePeriodMode, paymentDate, dueDate, paymentMethod, numberOfPayments, confirmationNumber, vendorName, notes, customFieldValues, amountCurrency, attachmentUri ->
                     viewModel.addInvoice(
                         categoryId = categoryId,
                         documentNumber = documentNumber,
@@ -401,10 +401,12 @@ fun ClearLedgerNavHost(
                         vendorName = vendorName,
                         notes = notes,
                         customFieldValues = customFieldValues,
-                        amountCurrency = amountCurrency
+                        amountCurrency = amountCurrency,
+                        attachmentUri = attachmentUri
                     )
                     // AddInvoiceScreen will also call onNavigateBack() after this
                 },
+                isAttachmentUriInUse = { uri -> viewModel.isAttachmentUriReferenced(uri) },
                 onNavigateBack = { navController.popIfSafe() }
             )
         }
@@ -539,8 +541,9 @@ fun ClearLedgerNavHost(
                 initialNotes = invoiceUi.notes ?: "",
                 initialCustomFieldValues = invoiceUi.customFieldValues,
                 initialAmountCurrency = invoiceUi.amountCurrency,
+                initialAttachmentUri = invoiceUi.attachmentUri,
                 onNavigateBack = { navController.popIfSafe() },
-                onSaveInvoice = { documentNumber, amountDue, paymentStatus, servicePeriodStartText, servicePeriodEndText, servicePeriodMode, paymentDate, dueDate, paymentMethod, numberOfPayments, confirmationNumber, vendorName, notes, customFieldValues, amountCurrency ->
+                onSaveInvoice = { documentNumber, amountDue, paymentStatus, servicePeriodStartText, servicePeriodEndText, servicePeriodMode, paymentDate, dueDate, paymentMethod, numberOfPayments, confirmationNumber, vendorName, notes, customFieldValues, amountCurrency, attachmentUri ->
                     viewModel.updateInvoice(
                         invoiceId = invoiceUi.id,
                         documentNumber = documentNumber,
@@ -557,10 +560,12 @@ fun ClearLedgerNavHost(
                         vendorName = vendorName,
                         notes = notes,
                         customFieldValues = customFieldValues,
-                        amountCurrency = amountCurrency
+                        amountCurrency = amountCurrency,
+                        attachmentUri = attachmentUri
                     )
                     // EditInvoiceScreen itself calls onNavigateBack()
-                }
+                },
+                isAttachmentUriInUse = { uri -> viewModel.isAttachmentUriReferenced(uri) }
             )
         }
         // -------------------------

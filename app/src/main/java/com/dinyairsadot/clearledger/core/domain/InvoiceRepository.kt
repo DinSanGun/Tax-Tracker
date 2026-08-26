@@ -35,4 +35,11 @@ interface InvoiceRepository {
      * Deletes an invoice by id.
      */
     suspend fun deleteInvoice(id: Long)
+
+    /**
+     * Returns how many persisted invoices currently reference [attachmentUri]. Used to decide
+     * whether a persisted SAF read permission for that Uri is safe to release, since multiple
+     * invoices may point at the same attachment.
+     */
+    suspend fun countInvoicesWithAttachmentUri(attachmentUri: String): Int
 }

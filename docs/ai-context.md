@@ -1,6 +1,6 @@
 # Clear Ledger (Android) — AI Context (Cursor)
 
-_Last updated: 2026-08-22_
+_Last updated: 2026-08-24_
 
 Concise working context for AI-assisted development. For the full overview see `docs/PROJECT_OVERVIEW.md`; for architecture patterns see `docs/ARCHITECTURE.md`; for release planning see `docs/LAUNCH_PLAN.md` and `docs/RELEASE.md`.
 
@@ -17,16 +17,19 @@ Supports **Hebrew and English** with manual language switching and RTL/LTR layou
 - **Backup** — restore-ready ZIP with `backup.json`
 - **Restore** — full replace of local app data from a backup ZIP
 
+**Invoice attachments (implemented, local-only):** one optional image/PDF attachment per invoice via SAF `OpenDocument` + a persisted read Uri permission (no copy into app storage). **Not yet included in backup/restore** — that's the next launch-prep stage.
+
 ---
 
 ## 2) Tech stack
 
 - Kotlin, Jetpack Compose (Material 3), Navigation Compose
 - MVVM: ViewModels + `StateFlow`, lifecycle-aware collection
-- Room (SQLite) v14 — `RoomCategoryRepository`, `RoomInvoiceRepository`, `RoomBackupRestoreRepository`
+- Room (SQLite) v15 — `RoomCategoryRepository`, `RoomInvoiceRepository`, `RoomBackupRestoreRepository`
 - No DI framework; repos wired in `MainActivity` / ViewModel factories
 - Export/backup: pure Kotlin in `core/util/` and `core/util/backup/`; SAF + file I/O in Compose screens
 - Share Sheet: `androidx.core.content.FileProvider` (manifest + `res/xml/file_paths.xml`) + `core/util/ShareExportUtil.kt`; `Intent.ACTION_SEND` / `Intent.createChooser` in Compose screens
+- Invoice attachments: SAF `OpenDocument` + persisted read Uri permission, `core/util/AttachmentUtil.kt`; `Intent.ACTION_VIEW` to open via external viewer
 - Gradle KTS with version catalog (`libs.*`)
 
 ---
@@ -47,6 +50,8 @@ Supports **Hebrew and English** with manual language switching and RTL/LTR layou
 | `core/util/InvoiceCsvExporter.kt` | Pure Kotlin invoice CSV generation |
 | `core/util/AllDataZipExporter.kt` | Pure Kotlin ZIP (categories.csv + invoice CSVs) |
 | `core/util/ShareExportUtil.kt` | Stages export bytes in cache, mints `FileProvider` Uri, opens Share Sheet |
+| `core/util/AttachmentUtil.kt` | Invoice attachment: persisted SAF read permission take/release, display name lookup, `ACTION_VIEW` open |
+| `feature/invoice/InvoiceAttachmentField.kt` | Shared attach/replace/remove control used by Add/Edit invoice forms |
 | `core/util/backup/BackupZipExporter.kt` | Pure Kotlin backup ZIP writer |
 | `core/util/backup/BackupZipImporter.kt` | Pure Kotlin backup ZIP reader |
 | `core/util/backup/BackupValidator.kt` | Defensive backup payload validation |
@@ -167,6 +172,14 @@ Invoice CSV export uses **`visibleInvoices`** (and category name/titles from UiS
 - Sets seeding flags after success; sets `last_applied_language` to current locale to prevent re-localization of backup category names on next launch; does not touch language preference
 - **CSV/ZIP exports are rejected** — only backup ZIPs with `backup.json`
 
+### Invoice attachments (Aug 2026, do not regress)
+- **Local-only for now:** `Invoice.attachmentUri` is intentionally excluded from `BackupInvoiceDto`/`BackupMapper`. Do not add it there without explicitly implementing attachment-aware backup/restore as its own stage (decide file embedding vs. documented limitation first).
+- **No copy into app storage:** the attachment stays wherever the user picked it from; the app only stores the `content://` Uri string and a persisted read permission grant (`AttachmentUtil.takePersistableReadPermission`). Do not add file-copying logic without a clear reason.
+- **Permission release timing matters:** never release the persisted permission for the invoice's currently-*saved* `attachmentUri` until a save actually replaces/removes it (see `AttachmentUtil.releaseIfUnreferenced` and the release call in `InvoiceListViewModel.updateInvoice`/`deleteInvoice`). Releasing too early breaks "attach → save → close app → reopen → still opens."
+- **Shared Uris across invoices are protected (Aug 2026 fix):** two invoices may legitimately reference the exact same `attachmentUri`. Before releasing any Uri's persisted permission — on update, delete, or an abandoned unsaved pick — callers must confirm via `InvoiceRepository.countInvoicesWithAttachmentUri` / `InvoiceListViewModel.isAttachmentUriReferenced` that no other **persisted** invoice still needs it. Never reintroduce an unconditional release.
+- **Unsaved-changes:** attachment changes are part of `EditableInvoiceSnapshot`; canceling the SAF picker must not itself count as a change.
+- **Export/Share Sheet unaffected:** CSV export, Export all data ZIP, and Share Sheet do not include attachment files — do not add them without an explicit request.
+
 ---
 
 ## 9) What NOT to change casually
@@ -181,6 +194,7 @@ Invoice CSV export uses **`visibleInvoices`** (and category name/titles from UiS
 | **Export scope & format** | Invoice export = visible only; ZIP skips empty invoice CSVs |
 | **Share Sheet scope** | Sharing must reuse existing export bytes as-is; do not add Gmail/Drive-specific APIs, Google auth, or a custom sharing UI |
 | **Backup format / restore semantics** | Full replace; validate before delete; preserve IDs |
+| **Invoice attachments** | Local-only (Uri reference, no file copy, not yet in backup/restore); do not release the saved attachment's SAF permission before a real save |
 | **Localization** | Both `values/` and `values-iw/` |
 | **Back navigation (`popIfSafe` + BackHandler)** | `popIfSafe()` in Navigation.kt and `BackHandler(enabled = true)` at CategoryList root must stay; removing either re-exposes the blank-screen bug on rapid back presses |
 
@@ -204,15 +218,17 @@ Ask before: DB migrations, conflating export with backup, allowing CSV restore, 
 
 **Settings screen / navigation cleanup (Aug 2026):** Category list overflow menu reduced to Export + Order categories only; added Settings gear icon → new `SettingsScreen` (`feature/settings/`) grouping Language, Text size, Create backup, Restore from backup, Reset all data, About. Pure navigation/UI reorganization — backup/restore/reset reuse the same `CategoryListViewModel` calls via shared back-stack entry; language implementation itself unchanged.
 
-**Android Share Sheet support for export (Aug 2026):** Added optional sharing on top of the existing export flow (invoice-list CSV + category-list all-data ZIP) — see section 7 above for the do-not-regress details. `FileProvider` + `res/xml/file_paths.xml` added (minimum config, scoped to `cacheDir/exports/` only). No export format/content changes, no backup/restore changes, no Gmail/Drive integration. Next launch-prep stage: receipt image/PDF attachments.
+**Android Share Sheet support for export (Aug 2026):** Added optional sharing on top of the existing export flow (invoice-list CSV + category-list all-data ZIP) — see section 7 above for the do-not-regress details. `FileProvider` + `res/xml/file_paths.xml` added (minimum config, scoped to `cacheDir/exports/` only). No export format/content changes, no backup/restore changes, no Gmail/Drive integration.
+
+**Invoice attachments (Aug 2026):** Added one optional local image/PDF attachment per invoice — see the do-not-regress subsection above. SAF `OpenDocument` + persisted read Uri permission (no file copy into app storage); Room bumped 14 → 15 (`MIGRATION_14_15`, additive `attachmentUri TEXT` column); Add/Edit forms gained an Attachment section wired into unsaved-changes detection; Invoice Details gained an Attachment section with an "Open" action (`ACTION_VIEW`, graceful failure via snackbar). **Local-only** — excluded from backup/restore DTOs on purpose; export/Share Sheet unchanged. Next launch-prep stage: attachment-aware backup/restore.
 
 ---
 
 ## 11) Project status (Jun 2026)
 
-**Done:** Room, bilingual UI, custom fields, search/filter/sort, service period, category reorder, UI polish, pre-launch refactor, user-facing export (CSV + ZIP), Android Share Sheet support for export, backup creation, full-replace restore, targeted unit tests (S9), GitHub Actions CI (S10), release polish (S11), documentation polish (S12), release identity (S13 — `com.dinyairsadot.clearledger`, v1.0.0), pre-release polish pass (dialog colors, navigation fix, custom field UI, locale/seeding fixes).
+**Done:** Room, bilingual UI, custom fields, search/filter/sort, service period, category reorder, UI polish, pre-launch refactor, user-facing export (CSV + ZIP), Android Share Sheet support for export, backup creation, full-replace restore, targeted unit tests (S9), GitHub Actions CI (S10), release polish (S11), documentation polish (S12), release identity (S13 — `com.dinyairsadot.clearledger`, v1.0.0), pre-release polish pass (dialog colors, navigation fix, custom field UI, locale/seeding fixes), one local image/PDF attachment per invoice (Aug 2026, local-only).
 
-**Next launch-prep stage:** receipt image/PDF attachments (not started).
+**Next launch-prep stage:** attachment-aware backup/restore (not started).
 
 **Pre-release (priority order — see `LAUNCH_PLAN` S9–S17):**
 1. **S9** — Targeted test hardening — **Done**

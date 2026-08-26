@@ -37,6 +37,12 @@ data class BackupCategoryDto(
     val orderIndex: Int
 )
 
+/**
+ * Intentionally does **not** include [com.dinyairsadot.clearledger.core.domain.Invoice.attachmentUri].
+ * Invoice attachment references are local to the device and attachment file backup/restore
+ * will be implemented in the next stage. Existing backups created before the attachment
+ * feature remain restorable unchanged; new backups simply omit attachment info for now.
+ */
 data class BackupInvoiceDto(
     val id: Long,
     val categoryId: Long,

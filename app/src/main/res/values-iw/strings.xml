@@ -160,6 +160,17 @@
     <string name="paid">שולם</string>
     <string name="paid_full">שולם במלואו</string>
     <string name="paid_credit">שולם באשראי</string>
+
+    <!-- Invoice Attachment (image/PDF, local-only for now) -->
+    <string name="attachment_section_title">צרופה</string>
+    <string name="attachment_none">אין צרופה</string>
+    <string name="attachment_attach_action">צרף תמונה או PDF</string>
+    <string name="attachment_replace_action">החלף</string>
+    <string name="attachment_remove_action">הסר</string>
+    <string name="attachment_open_action">פתח</string>
+    <string name="attachment_unknown_filename">קובץ מצורף</string>
+    <string name="attachment_unavailable_message">לא ניתן יותר לגשת לצרופה זו</string>
+    <string name="attachment_no_viewer_app_message">לא נמצאה אפליקציה שיכולה לפתוח קובץ זה</string>
     
     <!-- Invoice Details Screen -->
     <string name="invoice_details">פרטי חשבונית</string>

@@ -20,7 +20,7 @@ import com.dinyairsadot.clearledger.core.data.entities.InvoiceEntity
 
 @Database(
     entities = [CategoryEntity::class, InvoiceEntity::class],
-    version = 14,
+    version = 15,
     exportSchema = false
 )
 @TypeConverters(
@@ -215,6 +215,15 @@ abstract class ClearLedgerDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Optional single local attachment (image/PDF) per invoice. Stores a persisted
+                // SAF `content://` Uri string; the document itself is never copied into app
+                // storage. Existing rows get NULL (no attachment) — no data loss.
+                database.execSQL("ALTER TABLE invoices ADD COLUMN attachmentUri TEXT")
+            }
+        }
+
         fun getDatabase(context: Context): ClearLedgerDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -222,7 +231,7 @@ abstract class ClearLedgerDatabase : RoomDatabase() {
                     ClearLedgerDatabase::class.java,
                     "clear_ledger_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15)
                     .build()
                 INSTANCE = instance
                 instance
